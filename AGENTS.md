@@ -5,10 +5,10 @@
 
 ## 角色定位
 
-你是毕设 FPGA 开发层的**执行 Agent**。三层分工：
+你是毕设 FPGA 开发层的**执行 Agent**。三层分工 + 中控：
 - **Reasonian（Obsidian）＝规划层**：管知识库、待办、方向。vault 唯一写者。
 - **你（VSCode）＝开发层**：管本工程。工程目录唯一写者。
-- **CLI Reasonix＝杂活层**：一次性诊断，只读为主。
+- **Reasonix（桌面端）＝协调中控**：任务路由、同步中枢↔本文件、状态看板、杂活兜底。你只需向用户汇报状态，同步由中控负责。
 
 ## 硬红线（必须遵守）
 
@@ -39,10 +39,15 @@
 
 - ✅ Vitis **2026.1** 已装：`D:\AMDDesignTools\2026.1`（Vivado + Vitis 均在）
 - ✅ License：**ENTERPRISE**，有效期至 **2026-10-05**（`%APPDATA%\XilinxLicense\Xilinx.lic`，无需环境变量）
-- ⏳ 待办：Tcl 工程骨架：
-  1. `scripts/create_project.tcl` — 建工程 + 加源文件 + 约束
-  2. `scripts/bd_mb_minimal.tcl` — MicroBlaze 最小系统（Local Memory + UART + AXI Interconnect）
-  3. `scripts/build.tcl` — 综合→实现→bitstream
+- ✅ Tcl 工程骨架三件套（2026-08-06 实测通过 `validate_bd_design`）：
+  1. `scripts/create_project.tcl` — 建工程 + source BD 脚本
+  2. `scripts/bd_mb_minimal.tcl` — MicroBlaze 最小系统（Local Memory 64KB + UART 115200 + AXI Interconnect + MDM；无 board 时 automation 产物为 clk_wiz_1/rst_clk_wiz_1_100M/mdm_1，脚本动态获取名字）
+  3. `scripts/build.tcl` — 综合→实现→bitstream→导出 .xsa
+- ⏳ 待办（下一步）：
+  1. ⚠️ **用户确认板卡参数**（开发板手册/丝印）：part 速度等级（现默认 `xcku060-ffva1156-2-e`）、板载晶振频率/单端或差分（现默认 200MHz 单端）
+  2. 按板卡原理图补 `constr/ku060_pins.xdc`（uart_tx/rx、clk_in1_0、ext_reset_in 引脚 + IOSTANDARD）
+  3. 跑 `build.tcl` 生成 bitstream + .xsa（第一次综合建议 GUI 看一遍建立直觉）
+  4. Vitis 导入 .xsa，跑通 Hello World 串口打印 → 里程碑 **M1**
 - 🎯 里程碑 M1：Vitis 导入硬件平台，**Hello World 串口打印**
 - 📚 参考（vault 内，用户转述）：`操作文档/阶段一_Vitis环境与MicroBlaze软核.md`（手把手教程）、`8.3/2026-04-30/FPGA-SFP-communication-with-Aurora 项目详细介绍.md`（基线全貌）
 
@@ -68,6 +73,6 @@ FPGA_Project/
 ## 同步约定
 
 - 本文件 = 工程侧执行版；vault `Agent 协作/AI协作中枢.md` = 知识侧全量版
-- **工程状态变化** → 更新本文件"当前任务"节 → 提醒用户带回中枢
-- **中枢/规划变更** → 用户转达后，同步更新本文件
-- 两边不一致时，以用户最新转达为准
+- **工程状态变化** → 你更新本文件"当前任务"节，并向用户报告一句"状态已更新"；**中枢同步由协调中控（桌面端 Reasonix）负责，你无需跨目录操作**
+- **中枢/规划变更** → 协调中控会同步到本文件，新会话自动加载
+- 两边不一致时，向用户确认后以中枢为准
