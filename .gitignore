@@ -17,6 +17,12 @@ hw/*.str
 *.ltx
 *.xsa
 
+# Reasonix 运行时产物
+.reasonix/
+
+# Vivado 根目录运行日志
+vivado.log
+
 # 系统文件
 Thumbs.db
 .DS_Store
