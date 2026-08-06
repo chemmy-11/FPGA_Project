@@ -1,0 +1,22 @@
+# Vivado 工程生成物（hw\ 下全部可由 Tcl 重新生成，不入库）
+hw/*.cache/
+hw/*.gen/
+hw/*.hw/
+hw/*.ip_user_files/
+hw/*.runs/
+hw/*.sim/
+hw/*.srcs/
+hw/*.xpr
+hw/*.jou
+hw/*.log
+hw/.Xil/
+hw/*.str
+
+# 派生二进制（可由 Vivado 重新导出/生成）
+*.bit
+*.ltx
+*.xsa
+
+# 系统文件
+Thumbs.db
+.DS_Store
