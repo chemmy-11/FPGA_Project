@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # ===== Vivado 生成目录（可再生，不提交）=====
 .Xil/
 *.cache/
@@ -33,3 +34,38 @@ Thumbs.db
 
 # ===== 用户实验文件（未接入工程；注释声称的 DONE 修复无效，根因=part 选错）=====
 project_1/pins.xdc
+=======
+# Vivado 工程生成物（hw\ 下全部可由 Tcl 重新生成，不入库）
+hw/*.cache/
+hw/*.gen/
+hw/*.hw/
+hw/*.ip_user_files/
+hw/*.runs/
+hw/*.sim/
+hw/*.srcs/
+hw/*.xpr
+hw/*.jou
+hw/*.log
+hw/.Xil/
+hw/*.str
+
+# 派生二进制（可由 Vivado 重新导出/生成）
+*.bit
+*.ltx
+*.xsa
+
+# Reasonix 运行时产物
+.reasonix/
+
+# Vivado 根目录运行日志
+vivado.log
+
+# 系统文件
+Thumbs.db
+.DS_Store
+>>>>>>> origin/master
+
+# ===== 来自远端历史（旧 Tcl 时代）=====
+.reasonix/
+vivado.log
+.DS_Store
