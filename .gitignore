@@ -1,0 +1,35 @@
+# ===== Vivado 生成目录（可再生，不提交）=====
+.Xil/
+*.cache/
+*.gen/
+*.runs/
+*.hw/
+*.ip_user_files/
+*.sim/
+*.ioplanning/
+*.jou
+*.log
+
+# ===== 可再生产物（bitstream/XSA 均可由工程重新生成）=====
+*.bit
+*.bin
+*.mcs
+*.ltx
+*.xsa
+*.bak
+*.dcp
+project_1/project_1.srcs/utils_1/
+
+# ===== 废弃测试工程（勿入仓库）=====
+/test/
+
+# ===== 敏感文件：License 含授权信息，禁止提交 =====
+Xilinx_license_backup.lic
+
+# ===== IDE/系统 =====
+.vscode/
+.idea/
+Thumbs.db
+
+# ===== 用户实验文件（未接入工程；注释声称的 DONE 修复无效，根因=part 选错）=====
+project_1/pins.xdc
