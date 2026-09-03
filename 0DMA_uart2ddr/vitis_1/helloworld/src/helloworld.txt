@@ -1,0 +1,381 @@
+
+
+
+
+#include "platform.h"
+#include "xaxidma.h"
+#include "xil_cache.h"
+#include "xil_exception.h"
+#include "xil_printf.h"
+#include "xil_types.h"
+#include "xparameters.h"
+#include "xstatus.h"
+#include "xintc.h"
+
+#define DMA_DEV_ID          XPAR_AXIDMA_0_DEVICE_ID
+#define INTC_DEV_ID         XPAR_INTC_0_DEVICE_ID
+
+// 根据你的 xparameters.h 匹配的精确中断向量宏
+#define MM2S_INTRO_INTR_ID  XPAR_INTC_0_AXIDMA_0_MM2S_INTROUT_VEC_ID
+#define S2MM_INTRO_INTR_ID  XPAR_INTC_0_AXIDMA_0_S2MM_INTROUT_VEC_ID
+
+#define DMA_ALIGN_BYTES     4U
+#define DMA_TIMEOUT         10000000U
+
+#ifdef XPAR_DDR4_0_BASEADDR
+#define DDR_BASE_ADDR       XPAR_DDR4_0_BASEADDR
+#else
+#define DDR_BASE_ADDR       0x80000000U
+#endif
+
+#define ABC_SRC_BASE        (DDR_BASE_ADDR + 0x00100000U)
+#define NUM_SRC_BASE        (DDR_BASE_ADDR + 0x00101000U)
+#define ABC_DDR_BASE        (DDR_BASE_ADDR + 0x00200000U)
+#define NUM_DDR_BASE        (DDR_BASE_ADDR + 0x00201000U)
+#define DDR_READBACK_BASE   (DDR_BASE_ADDR + 0x00300000U)
+
+#define ABC_LEN             3U
+#define NUM_LEN             5U
+
+static XAxiDma AxiDma;
+static XIntc Intc;
+
+static const u8 AbcData[ABC_LEN] = {'A', 'B', 'C'};
+static const u8 NumData[NUM_LEN] = {'1', '2', '3', '4', '5'};
+
+// 使用 volatile 防止编译器对中断状态标志位进行错误优化
+static volatile int TxDone;
+static volatile int RxDone;
+static volatile int Error;
+
+// -----------------------------------------------------------------------------
+// 中断服务函数 (ISR)
+// -----------------------------------------------------------------------------
+
+// MM2S 发送完成中断服务函数
+static void DmaTxInterruptHandler(void *Callback)
+{
+    XAxiDma *XAxiDmaPtr = (XAxiDma *)Callback;
+    u32 IrqStatus;
+
+    // 读取中断标志位
+    IrqStatus = XAxiDma_IntrGetIrq(XAxiDmaPtr, XAXIDMA_DMA_TO_DEVICE);
+    //清除中断标志位
+    XAxiDma_IntrAckIrq(XAxiDmaPtr, IrqStatus, XAXIDMA_DMA_TO_DEVICE);
+
+    // 检查是否为完成中断（IOC）
+    if (!(IrqStatus & XAXIDMA_IRQ_IOC_MASK)) {
+        Error = 1;
+        return;
+    }
+
+    TxDone = 1;
+}
+
+// S2MM 接收完成中断服务函数
+static void DmaRxInterruptHandler(void *Callback)
+{
+    XAxiDma *XAxiDmaPtr = (XAxiDma *)Callback;
+    u32 IrqStatus;
+
+    // 读取中断标志位
+    IrqStatus = XAxiDma_IntrGetIrq(XAxiDmaPtr, XAXIDMA_DEVICE_TO_DMA);
+
+    // 使用正确的 Ack 函数清除中断标志位
+    XAxiDma_IntrAckIrq(XAxiDmaPtr, IrqStatus, XAXIDMA_DEVICE_TO_DMA);
+
+    if (!(IrqStatus & XAXIDMA_IRQ_IOC_MASK)) {
+        Error = 1;
+        return;
+    }
+
+    RxDone = 1;
+}
+
+
+// -----------------------------------------------------------------------------
+// 中断系统配置函数
+// -----------------------------------------------------------------------------
+static int SetupInterruptSystem(XIntc *IntcInstancePtr, XAxiDma *AxiDmaPtr,
+                                u16 TxIntrId, u16 RxIntrId)
+{
+    int Status;
+
+    // 1. 初始化中断控制器
+    Status = XIntc_Initialize(IntcInstancePtr, INTC_DEV_ID);
+    if (Status != XST_SUCCESS) {
+        return XST_FAILURE;
+    }
+
+    // 2. 绑定 MM2S 中断服务函数
+    Status = XIntc_Connect(IntcInstancePtr, TxIntrId,
+                           (XInterruptHandler)DmaTxInterruptHandler, AxiDmaPtr);
+    if (Status != XST_SUCCESS) {
+        return XST_FAILURE;
+    }
+
+    // 3. 绑定 S2MM 中断服务函数
+    Status = XIntc_Connect(IntcInstancePtr, RxIntrId,
+                           (XInterruptHandler)DmaRxInterruptHandler, AxiDmaPtr);
+    if (Status != XST_SUCCESS) {
+        return XST_FAILURE;
+    }
+
+    // 4. 启动中断控制器（使用标准的 XIL_COMPONENT_IS_READY 保证跨版本兼容）
+    Status = XIntc_Start(IntcInstancePtr, XIN_REAL_MODE);
+//    Status = XIntc_Start(IntcInstancePtr, XIL_COMPONENT_IS_READY);
+    if (Status != XST_SUCCESS) {
+        return XST_FAILURE;
+    }
+
+    // 5. 使能对应的中断输入线
+    XIntc_Enable(IntcInstancePtr, TxIntrId);
+    XIntc_Enable(IntcInstancePtr, RxIntrId);
+
+    // 6. 初始化并使能 MicroBlaze 硬件异常与中断总开关
+    Xil_ExceptionInit();
+//    Xil_ExceptionRegisterHandler(XIL_EXCEPTION_ID_INT,
+//                                 (Xil_ExceptionHandler)XIntc_DeviceInterruptHandler,
+//                                 IntcInstancePtr);
+    Xil_ExceptionRegisterHandler(XIL_EXCEPTION_ID_INT,
+                                     (Xil_ExceptionHandler)XIntc_InterruptHandler,
+                                     IntcInstancePtr);
+    Xil_ExceptionEnable();
+
+    return XST_SUCCESS;
+}
+
+static u32 align_up(u32 value, u32 align)
+{
+    return (value + align - 1U) & ~(align - 1U);
+}
+
+static int init_dma(void)
+{
+    XAxiDma_Config *CfgPtr;
+    int Status;
+
+    CfgPtr = XAxiDma_LookupConfig(DMA_DEV_ID);
+    if (CfgPtr == NULL) {
+        xil_printf("ERROR: DMA config not found.\r\n");
+        return XST_FAILURE;
+    }
+
+    Status = XAxiDma_CfgInitialize(&AxiDma, CfgPtr);
+    if (Status != XST_SUCCESS) {
+        xil_printf("ERROR: DMA init failed: %d\r\n", Status);
+        return XST_FAILURE;
+    }
+
+    if (XAxiDma_HasSg(&AxiDma)) {
+        xil_printf("ERROR: DMA is in SG mode; this app expects simple mode.\r\n");
+        return XST_FAILURE;
+    }
+
+    XAxiDma_Reset(&AxiDma);
+    Status = DMA_TIMEOUT;
+    while (XAxiDma_ResetIsDone(&AxiDma) == 0) {
+        if (--Status == 0) {
+            xil_printf("ERROR: DMA reset timeout.\r\n");
+            return XST_FAILURE;
+        }
+    }
+
+    // 开启 DMA 内部的传输完成中断使能
+    XAxiDma_IntrEnable(&AxiDma, XAXIDMA_IRQ_IOC_MASK, XAXIDMA_DMA_TO_DEVICE);
+    XAxiDma_IntrEnable(&AxiDma, XAXIDMA_IRQ_IOC_MASK, XAXIDMA_DEVICE_TO_DMA);
+
+    return XST_SUCCESS;
+}
+
+static void copy_bytes(u8 *Dst, const u8 *Src, u32 Length)
+{
+    u32 Index = 0U;
+    for (Index = 0U; Index < Length; Index++) {
+        Dst[Index] = Src[Index];
+    }
+}
+
+// -----------------------------------------------------------------------------
+// 基于中断等待的环路拷贝函数
+// -----------------------------------------------------------------------------
+static int dma_copy_via_axis_loopback(u8 *SrcBuffer, u8 *DstBuffer, u32 Length)
+{
+    u32 DmaLength;
+    u32 Index;
+    u32 Timeout;
+    int Status;
+
+    if (Length == 0U) {
+        return XST_SUCCESS;
+    }
+
+    DmaLength = align_up(Length, DMA_ALIGN_BYTES);
+
+    for (Index = Length; Index < DmaLength; Index++) {
+        SrcBuffer[Index] = 0U;
+    }
+    for (Index = 0U; Index < DmaLength; Index++) {
+        DstBuffer[Index] = 0U;
+    }
+
+    Xil_DCacheFlushRange((UINTPTR)SrcBuffer, DmaLength);
+    Xil_DCacheFlushRange((UINTPTR)DstBuffer, DmaLength);
+
+    // 传输前初始化标志位
+    TxDone = 0;
+    RxDone = 0;
+    Error  = 0;
+
+    // 先启动接收 (S2MM)
+    Status = XAxiDma_SimpleTransfer(&AxiDma, (UINTPTR)DstBuffer,
+                                    DmaLength, XAXIDMA_DEVICE_TO_DMA);
+    if (Status != XST_SUCCESS) {
+        xil_printf("ERROR: S2MM transfer start failed: %d\r\n", Status);
+        return XST_FAILURE;
+    }
+
+    // 后启动发送 (MM2S)
+    Status = XAxiDma_SimpleTransfer(&AxiDma, (UINTPTR)SrcBuffer,
+                                    DmaLength, XAXIDMA_DMA_TO_DEVICE);
+    if (Status != XST_SUCCESS) {
+        xil_printf("ERROR: MM2S transfer start failed: %d\r\n", Status);
+        return XST_FAILURE;
+    }
+
+    // 等待中断服务程序将标志位置位
+    Timeout = DMA_TIMEOUT;
+    while (!TxDone || !RxDone) {
+        if (Error) {
+            xil_printf("ERROR: DMA transfer reported an internal error.\r\n");
+            return XST_FAILURE;
+        }
+        if (--Timeout == 0U) {
+            xil_printf("ERROR: DMA Interrupt Timeout. TxDone=%d, RxDone=%d\r\n", TxDone, RxDone);
+            return XST_FAILURE;
+        }
+    }
+
+    Xil_DCacheInvalidateRange((UINTPTR)DstBuffer, DmaLength);
+    return XST_SUCCESS;
+}
+
+static int verify_bytes(const u8 *Expected, const u8 *Actual, u32 Length)
+{
+    u32 Index;
+    for (Index = 0U; Index < Length; Index++) {
+        if (Actual[Index] != Expected[Index]) {
+            xil_printf("ERROR: mismatch at %d, expected=0x%02x actual=0x%02x\r\n",
+                       Index, Expected[Index], Actual[Index]);
+            return XST_FAILURE;
+        }
+    }
+    return XST_SUCCESS;
+}
+
+static void print_bytes(const u8 *Buffer, u32 Length)
+{
+    u32 Index;
+    for (Index = 0U; Index < Length; Index++) {
+        outbyte((char)Buffer[Index]);
+    }
+}
+
+static int run_fixed_dma_demo(void)
+{
+    u8 *AbcSrc = (u8 *)ABC_SRC_BASE;
+    u8 *NumSrc = (u8 *)NUM_SRC_BASE;
+    u8 *AbcDdr = (u8 *)ABC_DDR_BASE;
+    u8 *NumDdr = (u8 *)NUM_DDR_BASE;
+    u8 *Readback = (u8 *)DDR_READBACK_BASE;
+    int Status;
+
+    copy_bytes(AbcSrc, AbcData, ABC_LEN);
+    copy_bytes(NumSrc, NumData, NUM_LEN);
+
+    Status = dma_copy_via_axis_loopback(AbcSrc, AbcDdr, ABC_LEN);
+    if (Status != XST_SUCCESS) {
+        xil_printf("ERROR: DMA write ABC to DDR failed.\r\n");
+        return Status;
+    }
+
+    Status = dma_copy_via_axis_loopback(NumSrc, NumDdr, NUM_LEN);
+    if (Status != XST_SUCCESS) {
+        xil_printf("ERROR: DMA write 12345 to DDR failed.\r\n");
+        return Status;
+    }
+
+    Status = verify_bytes(AbcData, AbcDdr, ABC_LEN);
+    if (Status != XST_SUCCESS) {
+        xil_printf("ERROR: ABC verification in DDR failed.\r\n");
+        return Status;
+    }
+
+    Status = verify_bytes(NumData, NumDdr, NUM_LEN);
+    if (Status != XST_SUCCESS) {
+        xil_printf("ERROR: 12345 verification in DDR failed.\r\n");
+        return Status;
+    }
+
+    Status = dma_copy_via_axis_loopback(NumDdr, Readback, NUM_LEN);
+    if (Status != XST_SUCCESS) {
+        xil_printf("ERROR: DMA read 12345 from DDR failed.\r\n");
+        return Status;
+    }
+
+    Status = verify_bytes(NumData, Readback, NUM_LEN);
+    if (Status != XST_SUCCESS) {
+        xil_printf("ERROR: readback verification failed.\r\n");
+        return Status;
+    }
+
+    xil_printf("DMA wrote ABC to DDR @ 0x%08x.\r\n", (u32)ABC_DDR_BASE);
+    xil_printf("DMA wrote 12345 to DDR @ 0x%08x.\r\n", (u32)NUM_DDR_BASE);
+    xil_printf("DMA read selected data from DDR @ 0x%08x.\r\n", (u32)NUM_DDR_BASE);
+    xil_printf("UART print: ");
+    print_bytes(Readback, NUM_LEN);
+    xil_printf("\r\n");
+    xil_printf("Demo complete.\r\n");
+
+    return XST_SUCCESS;
+}
+
+int main(void)
+{
+    init_platform();
+
+    xil_printf("\r\n=================================\r\n");
+    xil_printf(" Interrupt-Driven DDR DMA Demo\r\n");
+    xil_printf("=================================\r\n");
+    xil_printf("UART baudrate: %d\r\n", (u32)XPAR_UARTLITE_0_BAUDRATE);
+
+    // 1. 初始化 DMA 硬件
+    if (init_dma() != XST_SUCCESS) {
+        xil_printf("DMA initialization failed.\r\n");
+        cleanup_platform();
+        return XST_FAILURE;
+    }
+    xil_printf("DMA initialized.\r\n");
+
+    // 2. 初始化中断系统并注册外设 ISR
+    if (SetupInterruptSystem(&Intc, &AxiDma, MM2S_INTRO_INTR_ID, S2MM_INTRO_INTR_ID) != XST_SUCCESS) {
+        xil_printf("Interrupt System setup failed.\r\n");
+        cleanup_platform();
+        return XST_FAILURE;
+    }
+    xil_printf("Interrupt system initialized & enabled.\r\n");
+
+    // 3. 执行核心 DMA Demo 逻辑
+    if (run_fixed_dma_demo() != XST_SUCCESS) {
+        xil_printf("Demo failed.\r\n");
+        cleanup_platform();
+        return XST_FAILURE;
+    }
+
+    while (1) {
+    }
+
+    cleanup_platform();
+    return XST_SUCCESS;
+}
+

@@ -1,0 +1,17 @@
+DMA 请求读 0x80100000，DDR4 控制器把这个 AXI 地址转换成 DDR 命令；
+外部 DDR4 芯片 通过ddr4_0/C0_DDR4 物理接口被MIG读出数据
+-> DDR4 控制器  
+-> ddr4_0/C0_DDR4_S_AXI  
+-> axi_smc/M00_AXI  
+-> axi_smc/S00_AXI 
+-> axi_dma_0/M_AXI_MM2S
+-> axi_dma_0/M_AXIS_MM2S  
+-> axis_data_fifo_0/S_AXIS
+-> axis_data_fifo_0/M_AXIS
+-> axi_dma_0/S_AXIS_S2MM 
+-> axi_dma_0/M_AXI_S2MM
+-> axi_smc/S01_AXI
+-> axi_smc/M00_AXI
+-> ddr4_0/C0_DDR4_S_AXI
+-> DDR4 控制器  
+-> 通过ddr4_0/C0_DDR4 物理接口 向 0x80A00000地址写数据
