@@ -1,0 +1,307 @@
+TOTAL: 153
+CONFIG.ADDN_UI_CLKOUT1.INSERT_VIP = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.ADDN_UI_CLKOUT1.INSERT_VIP' specified for 'object'.
+
+CONFIG.ADDN_UI_CLKOUT1_FREQ_HZ = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.ADDN_UI_CLKOUT1_FREQ_HZ' specified for 'object'.
+
+CONFIG.ADDN_UI_CLKOUT2.INSERT_VIP = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.ADDN_UI_CLKOUT2.INSERT_VIP' specified for 'object'.
+
+CONFIG.ADDN_UI_CLKOUT2_FREQ_HZ = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.ADDN_UI_CLKOUT2_FREQ_HZ' specified for 'object'.
+
+CONFIG.ADDN_UI_CLKOUT3.INSERT_VIP = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.ADDN_UI_CLKOUT3.INSERT_VIP' specified for 'object'.
+
+CONFIG.ADDN_UI_CLKOUT3_FREQ_HZ = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.ADDN_UI_CLKOUT3_FREQ_HZ' specified for 'object'.
+
+CONFIG.ADDN_UI_CLKOUT4.INSERT_VIP = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.ADDN_UI_CLKOUT4.INSERT_VIP' specified for 'object'.
+
+CONFIG.ADDN_UI_CLKOUT4_FREQ_HZ = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.ADDN_UI_CLKOUT4_FREQ_HZ' specified for 'object'.
+
+CONFIG.AL_SEL = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.AL_SEL' specified for 'object'.
+
+CONFIG.C0.ADDR_WIDTH = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.ADDR_WIDTH' specified for 'object'.
+
+CONFIG.C0.BANK_GROUP_WIDTH = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.BANK_GROUP_WIDTH' specified for 'object'.
+
+CONFIG.C0.CKE_WIDTH = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.CKE_WIDTH' specified for 'object'.
+
+CONFIG.C0.CK_WIDTH = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.CK_WIDTH' specified for 'object'.
+
+CONFIG.C0.CS_WIDTH = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.CS_WIDTH' specified for 'object'.
+
+CONFIG.C0.ControllerType = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.ControllerType' specified for 'object'.
+
+CONFIG.C0.DDR4_ACT_SKEW = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_ACT_SKEW' specified for 'object'.
+
+CONFIG.C0.DDR4_ADDR_SKEW_0 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_ADDR_SKEW_0' specified for 'object'.
+
+CONFIG.C0.DDR4_ADDR_SKEW_1 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_ADDR_SKEW_1' specified for 'object'.
+
+CONFIG.C0.DDR4_ADDR_SKEW_10 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_ADDR_SKEW_10' specified for 'object'.
+
+CONFIG.C0.DDR4_ADDR_SKEW_11 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_ADDR_SKEW_11' specified for 'object'.
+
+CONFIG.C0.DDR4_ADDR_SKEW_12 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_ADDR_SKEW_12' specified for 'object'.
+
+CONFIG.C0.DDR4_ADDR_SKEW_13 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_ADDR_SKEW_13' specified for 'object'.
+
+CONFIG.C0.DDR4_ADDR_SKEW_14 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_ADDR_SKEW_14' specified for 'object'.
+
+CONFIG.C0.DDR4_ADDR_SKEW_15 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_ADDR_SKEW_15' specified for 'object'.
+
+CONFIG.C0.DDR4_ADDR_SKEW_16 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_ADDR_SKEW_16' specified for 'object'.
+
+CONFIG.C0.DDR4_ADDR_SKEW_17 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_ADDR_SKEW_17' specified for 'object'.
+
+CONFIG.C0.DDR4_ADDR_SKEW_2 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_ADDR_SKEW_2' specified for 'object'.
+
+CONFIG.C0.DDR4_ADDR_SKEW_3 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_ADDR_SKEW_3' specified for 'object'.
+
+CONFIG.C0.DDR4_ADDR_SKEW_4 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_ADDR_SKEW_4' specified for 'object'.
+
+CONFIG.C0.DDR4_ADDR_SKEW_5 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_ADDR_SKEW_5' specified for 'object'.
+
+CONFIG.C0.DDR4_ADDR_SKEW_6 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_ADDR_SKEW_6' specified for 'object'.
+
+CONFIG.C0.DDR4_ADDR_SKEW_7 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_ADDR_SKEW_7' specified for 'object'.
+
+CONFIG.C0.DDR4_ADDR_SKEW_8 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_ADDR_SKEW_8' specified for 'object'.
+
+CONFIG.C0.DDR4_ADDR_SKEW_9 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_ADDR_SKEW_9' specified for 'object'.
+
+CONFIG.C0.DDR4_AUTO_AP_COL_A3 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_AUTO_AP_COL_A3' specified for 'object'.
+
+CONFIG.C0.DDR4_AutoPrecharge = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_AutoPrecharge' specified for 'object'.
+
+CONFIG.C0.DDR4_AxiAddressWidth = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_AxiAddressWidth' specified for 'object'.
+
+CONFIG.C0.DDR4_AxiArbitrationScheme = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_AxiArbitrationScheme' specified for 'object'.
+
+CONFIG.C0.DDR4_AxiDataWidth = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_AxiDataWidth' specified for 'object'.
+
+CONFIG.C0.DDR4_AxiIDWidth = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_AxiIDWidth' specified for 'object'.
+
+CONFIG.C0.DDR4_AxiNarrowBurst = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_AxiNarrowBurst' specified for 'object'.
+
+CONFIG.C0.DDR4_AxiSelection = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_AxiSelection' specified for 'object'.
+
+CONFIG.C0.DDR4_BA_SKEW_0 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_BA_SKEW_0' specified for 'object'.
+
+CONFIG.C0.DDR4_BA_SKEW_1 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_BA_SKEW_1' specified for 'object'.
+
+CONFIG.C0.DDR4_BG_SKEW_0 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_BG_SKEW_0' specified for 'object'.
+
+CONFIG.C0.DDR4_BG_SKEW_1 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_BG_SKEW_1' specified for 'object'.
+
+CONFIG.C0.DDR4_BurstLength = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_BurstLength' specified for 'object'.
+
+CONFIG.C0.DDR4_BurstType = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_BurstType' specified for 'object'.
+
+CONFIG.C0.DDR4_CKE_SKEW_0 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_CKE_SKEW_0' specified for 'object'.
+
+CONFIG.C0.DDR4_CKE_SKEW_1 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_CKE_SKEW_1' specified for 'object'.
+
+CONFIG.C0.DDR4_CKE_SKEW_2 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_CKE_SKEW_2' specified for 'object'.
+
+CONFIG.C0.DDR4_CKE_SKEW_3 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_CKE_SKEW_3' specified for 'object'.
+
+CONFIG.C0.DDR4_CK_SKEW_0 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_CK_SKEW_0' specified for 'object'.
+
+CONFIG.C0.DDR4_CK_SKEW_1 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_CK_SKEW_1' specified for 'object'.
+
+CONFIG.C0.DDR4_CK_SKEW_2 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_CK_SKEW_2' specified for 'object'.
+
+CONFIG.C0.DDR4_CK_SKEW_3 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_CK_SKEW_3' specified for 'object'.
+
+CONFIG.C0.DDR4_CLKFBOUT_MULT = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_CLKFBOUT_MULT' specified for 'object'.
+
+CONFIG.C0.DDR4_CLKOUT0_DIVIDE = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_CLKOUT0_DIVIDE' specified for 'object'.
+
+CONFIG.C0.DDR4_CS_SKEW_0 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_CS_SKEW_0' specified for 'object'.
+
+CONFIG.C0.DDR4_CS_SKEW_1 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_CS_SKEW_1' specified for 'object'.
+
+CONFIG.C0.DDR4_CS_SKEW_2 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_CS_SKEW_2' specified for 'object'.
+
+CONFIG.C0.DDR4_CS_SKEW_3 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_CS_SKEW_3' specified for 'object'.
+
+CONFIG.C0.DDR4_Capacity = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_Capacity' specified for 'object'.
+
+CONFIG.C0.DDR4_CasLatency = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_CasLatency' specified for 'object'.
+
+CONFIG.C0.DDR4_CasWriteLatency = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_CasWriteLatency' specified for 'object'.
+
+CONFIG.C0.DDR4_ChipSelect = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_ChipSelect' specified for 'object'.
+
+CONFIG.C0.DDR4_Clamshell = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_Clamshell' specified for 'object'.
+
+CONFIG.C0.DDR4_CustomParts = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_CustomParts' specified for 'object'.
+
+CONFIG.C0.DDR4_DIVCLK_DIVIDE = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_DIVCLK_DIVIDE' specified for 'object'.
+
+CONFIG.C0.DDR4_DataMask = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_DataMask' specified for 'object'.
+
+CONFIG.C0.DDR4_DataWidth = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_DataWidth' specified for 'object'.
+
+CONFIG.C0.DDR4_EN_PARITY = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_EN_PARITY' specified for 'object'.
+
+CONFIG.C0.DDR4_Ecc = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_Ecc' specified for 'object'.
+
+CONFIG.C0.DDR4_Enable_LVAUX = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_Enable_LVAUX' specified for 'object'.
+
+CONFIG.C0.DDR4_InputClockPeriod = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_InputClockPeriod' specified for 'object'.
+
+CONFIG.C0.DDR4_LR_SKEW_0 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_LR_SKEW_0' specified for 'object'.
+
+CONFIG.C0.DDR4_LR_SKEW_1 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_LR_SKEW_1' specified for 'object'.
+
+CONFIG.C0.DDR4_MCS_ECC = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_MCS_ECC' specified for 'object'.
+
+CONFIG.C0.DDR4_Mem_Add_Map = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_Mem_Add_Map' specified for 'object'.
+
+CONFIG.C0.DDR4_MemoryName = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_MemoryName' specified for 'object'.
+
+CONFIG.C0.DDR4_MemoryPart = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_MemoryPart' specified for 'object'.
+
+CONFIG.C0.DDR4_MemoryType = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_MemoryType' specified for 'object'.
+
+CONFIG.C0.DDR4_MemoryVoltage = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_MemoryVoltage' specified for 'object'.
+
+CONFIG.C0.DDR4_ODT_SKEW_0 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_ODT_SKEW_0' specified for 'object'.
+
+CONFIG.C0.DDR4_ODT_SKEW_1 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_ODT_SKEW_1' specified for 'object'.
+
+CONFIG.C0.DDR4_ODT_SKEW_2 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_ODT_SKEW_2' specified for 'object'.
+
+CONFIG.C0.DDR4_ODT_SKEW_3 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_ODT_SKEW_3' specified for 'object'.
+
+CONFIG.C0.DDR4_OnDieTermination = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_OnDieTermination' specified for 'object'.
+
+CONFIG.C0.DDR4_Ordering = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_Ordering' specified for 'object'.
+
+CONFIG.C0.DDR4_OutputDriverImpedenceControl = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_OutputDriverImpedenceControl' specified for 'object'.
+
+CONFIG.C0.DDR4_PAR_SKEW = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_PAR_SKEW' specified for 'object'.
+
+CONFIG.C0.DDR4_PhyClockRatio = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_PhyClockRatio' specified for 'object'.
+
+CONFIG.C0.DDR4_RESTORE_CRC = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_RESTORE_CRC' specified for 'object'.
+
+CONFIG.C0.DDR4_SAVE_RESTORE = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_SAVE_RESTORE' specified for 'object'.
+
+CONFIG.C0.DDR4_SELF_REFRESH = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_SELF_REFRESH' specified for 'object'.
+
+CONFIG.C0.DDR4_Slot = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_Slot' specified for 'object'.
+
+CONFIG.C0.DDR4_Specify_MandD = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_Specify_MandD' specified for 'object'.
+
+CONFIG.C0.DDR4_TREFI = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_TREFI' specified for 'object'.
+
+CONFIG.C0.DDR4_TRFC = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_TRFC' specified for 'object'.
+
+CONFIG.C0.DDR4_TRFC_DLR = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_TRFC_DLR' specified for 'object'.
+
+CONFIG.C0.DDR4_TXPR = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_TXPR' specified for 'object'.
+
+CONFIG.C0.DDR4_TimePeriod = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_TimePeriod' specified for 'object'.
+
+CONFIG.C0.DDR4_UserRefresh_ZQCS = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_UserRefresh_ZQCS' specified for 'object'.
+
+CONFIG.C0.DDR4_isCKEShared = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_isCKEShared' specified for 'object'.
+
+CONFIG.C0.DDR4_isCustom = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_isCustom' specified for 'object'.
+
+CONFIG.C0.DDR4_nCK_TREFI = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_nCK_TREFI' specified for 'object'.
+
+CONFIG.C0.DDR4_nCK_TRFC = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_nCK_TRFC' specified for 'object'.
+
+CONFIG.C0.DDR4_nCK_TRFC_DLR = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_nCK_TRFC_DLR' specified for 'object'.
+
+CONFIG.C0.DDR4_nCK_TXPR = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.DDR4_nCK_TXPR' specified for 'object'.
+
+CONFIG.C0.LR_WIDTH = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.LR_WIDTH' specified for 'object'.
+
+CONFIG.C0.MIGRATION = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.MIGRATION' specified for 'object'.
+
+CONFIG.C0.ODT_WIDTH = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.ODT_WIDTH' specified for 'object'.
+
+CONFIG.C0.StackHeight = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0.StackHeight' specified for 'object'.
+
+CONFIG.C0_CLOCK_BOARD_INTERFACE = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0_CLOCK_BOARD_INTERFACE' specified for 'object'.
+
+CONFIG.C0_DDR4_ARESETN.INSERT_VIP = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0_DDR4_ARESETN.INSERT_VIP' specified for 'object'.
+
+CONFIG.C0_DDR4_BOARD_INTERFACE = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0_DDR4_BOARD_INTERFACE' specified for 'object'.
+
+CONFIG.C0_DDR4_CLOCK.INSERT_VIP = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0_DDR4_CLOCK.INSERT_VIP' specified for 'object'.
+
+CONFIG.C0_DDR4_MEMORY_MAP_BASEADDR = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0_DDR4_MEMORY_MAP_BASEADDR' specified for 'object'.
+
+CONFIG.C0_DDR4_MEMORY_MAP_CTRL_BASEADDR = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0_DDR4_MEMORY_MAP_CTRL_BASEADDR' specified for 'object'.
+
+CONFIG.C0_DDR4_MEMORY_MAP_CTRL_HIGHADDR = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0_DDR4_MEMORY_MAP_CTRL_HIGHADDR' specified for 'object'.
+
+CONFIG.C0_DDR4_MEMORY_MAP_HIGHADDR = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0_DDR4_MEMORY_MAP_HIGHADDR' specified for 'object'.
+
+CONFIG.C0_DDR4_RESET.INSERT_VIP = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0_DDR4_RESET.INSERT_VIP' specified for 'object'.
+
+CONFIG.C0_DDR4_S_AXI.INSERT_VIP = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0_DDR4_S_AXI.INSERT_VIP' specified for 'object'.
+
+CONFIG.C0_DDR4_S_AXI_CTRL.INSERT_VIP = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0_DDR4_S_AXI_CTRL.INSERT_VIP' specified for 'object'.
+
+CONFIG.C0_SYS_CLK_I.INSERT_VIP = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.C0_SYS_CLK_I.INSERT_VIP' specified for 'object'.
+
+CONFIG.CLKOUT6 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.CLKOUT6' specified for 'object'.
+
+CONFIG.Component_Name = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.Component_Name' specified for 'object'.
+
+CONFIG.DCI_Cascade = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.DCI_Cascade' specified for 'object'.
+
+CONFIG.DIFF_TERM_SYSCLK = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.DIFF_TERM_SYSCLK' specified for 'object'.
+
+CONFIG.Debug_Signal = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.Debug_Signal' specified for 'object'.
+
+CONFIG.Default_Bank_Selections = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.Default_Bank_Selections' specified for 'object'.
+
+CONFIG.EN_PP_4R_MIR = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.EN_PP_4R_MIR' specified for 'object'.
+
+CONFIG.Enable_SysPorts = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.Enable_SysPorts' specified for 'object'.
+
+CONFIG.Example_TG = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.Example_TG' specified for 'object'.
+
+CONFIG.IOPowerReduction = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.IOPowerReduction' specified for 'object'.
+
+CONFIG.IO_Power_Reduction = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.IO_Power_Reduction' specified for 'object'.
+
+CONFIG.IS_FROM_PHY = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.IS_FROM_PHY' specified for 'object'.
+
+CONFIG.MCS_DBG_EN = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.MCS_DBG_EN' specified for 'object'.
+
+CONFIG.MCS_WO_DSP = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.MCS_WO_DSP' specified for 'object'.
+
+CONFIG.No_Controller = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.No_Controller' specified for 'object'.
+
+CONFIG.PARTIAL_RECONFIG_FLOW_MIG = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.PARTIAL_RECONFIG_FLOW_MIG' specified for 'object'.
+
+CONFIG.PING_PONG_PHY = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.PING_PONG_PHY' specified for 'object'.
+
+CONFIG.Phy_Only = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.Phy_Only' specified for 'object'.
+
+CONFIG.RECONFIG_XSDB_SAVE_RESTORE = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.RECONFIG_XSDB_SAVE_RESTORE' specified for 'object'.
+
+CONFIG.RESET_BOARD_INTERFACE = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.RESET_BOARD_INTERFACE' specified for 'object'.
+
+CONFIG.Reference_Clock = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.Reference_Clock' specified for 'object'.
+
+CONFIG.SET_DW_TO_40 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.SET_DW_TO_40' specified for 'object'.
+
+CONFIG.SYSTEM_RESET.INSERT_VIP = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.SYSTEM_RESET.INSERT_VIP' specified for 'object'.
+
+CONFIG.Simulation_Mode = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.Simulation_Mode' specified for 'object'.
+
+CONFIG.System_Clock = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.System_Clock' specified for 'object'.
+
+CONFIG.TIMING_3DS = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.TIMING_3DS' specified for 'object'.
+
+CONFIG.TIMING_OP1 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.TIMING_OP1' specified for 'object'.
+
+CONFIG.TIMING_OP2 = GETERR: ERROR: [Common 17-161] Invalid option value 'CONFIG.TIMING_OP2' specified for 'object'.
+

@@ -1,0 +1,14 @@
+=== MemoryPart 合法值（�? MT40A512 的）===
+  (总数 0)
+SETOK   CONFIG.C0.DDR4_MemoryPart = MT40A512M16HA-083E
+SETOK   CONFIG.C0.DDR4_DataWidth = 64
+SETOK   CONFIG.C0.DDR4_AxiSelection = true
+SETOK   CONFIG.C0.DDR4_AxiDataWidth = 512
+SETOK   CONFIG.C0.DDR4_TimePeriod = 833
+SETFAIL CONFIG.C0.DDR4_InputClockPeriod = 10000  => ERROR: [Common 17-39] 'set_property' failed due to earlier errors.
+
+SETOK   CONFIG.System_Clock = Differential
+SETOK   CONFIG.C0.DDR4_MemoryVoltage = 1.2V
+=== 设置后属性总数: 153 ===
+PINPROP: CONFIG.C0.DDR4_OutputDriverImpedenceControl = RZQ/7
+PINPROP: CONFIG.PING_PONG_PHY = 1
