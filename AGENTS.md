@@ -46,7 +46,19 @@
   3. **控制信号引脚 = 版本 A**（TX_DIS=H26/AH12/J25/AF12、RS0=G27/AH11/M26/AF13、RS1=H27/AG11/M25/AE13，索引 0~3=SFPD/B/C/A）——指南 XDC = 引脚表工作表1 = io_placed 报告三方一致。
   - 工程留档：例程工程 `D:\FPGA\ibert_ultrascale_gth_0\ibert_ultrascale_gth_0_ex\`（IBERT exdes，顶层含 sfp 控制补丁 + 版本 A XDC）；`project_2` 主工程可归档。眼图截图待归档 `ibert_eye_test\docs\`
   - ⏸️ **MIG/DDR4 搁置（2026-08-31 导师指示）**：位流已产出（`project_4`，含自研 AXI4 主机验证载体；DDR4 实况=4×MT40A512M16/4GB/DDR4-2400/BANK44-46）、定版卡完备，待解冻收尾（上板校准+比对）
-  - ▶️ **当前步 = 阶段 2.5 上下位机+验证 SFP（UART 串口先行，路线图决策 #6）**：实操单 = vault `操作文档/阶段二之四_串口Aurora上下位机验证实操单.md`（自写 UART+帧适配+Aurora 内部环回；PC 侧三级验证）。之后：DMA 环回 → DMA↔Aurora 合体（真实光路证据在此产生）→ MicroBlaze 控制面；网口（双 RGMII，ATK91131A 座）推迟至多 Agent 联调前
+  - ▶️ **当前步 = 架构定版后的短期目标（路线图决策 #10，2026-09-04 更新）**：**端点/上位机 = 标准以太网（千兆）；Aurora 64b/66b = 板间干线**（加板后启用）。
+    - **① 上位机以太网传输 ✅（09-04 闭环）**：`project_6`（官方 39_eth_udp_loop 整包移植）上板验证通过——ping / UDP 回环 / Wireshark 四包链，pcapng 归档 `project_6\docs\`
+    - **② Aurora 数据级桥（短期目标②，2026-09-10 位流就绪）**：PC UDP 实际数据经 Aurora 64b/66b 内环往返的**数据级**传输验证 —— 区别于 08-31 的链路层自测
+      - **工程**：`D:\FPGA\project_8`（官方 39 栈 15 文件 + Aurora 共享逻辑 7 文件 + 2×reg_slice IP + 新增 `axis_word_pack/unpack` + 帧泵双向复用）；`create_project.tcl` / `build_debug.tcl` 幂等；设计说明 `docs\设计说明_Aurora_UDP数据级桥.md`
+      - **位流**：`out/aurora_udp_bridge.bit` —— **时序收敛 WNS=+1.062 ns**（"All user specified timing constraints are met"）、DRC 0 错、双 ILA（ILA0@user_clk / ILA1@eth_rxc）、布线后检查点 `scripts/post_route.dcp`、探针 `scripts/probes.ltx`
+      - **架构定版（与原方案的一处改动）**：Aurora **只插在「栈 TX → PC」单向路径**（回显帧 dst=请求方 MAC 天然不重入栈 → 自终止，不需要第二例 udp_rx）；帧泵读侧被 `~channel_up` **硬门控** → Aurora 没起来板卡对外完全不说话 → **判据无旁路**（`P′==P` 只可能来自真的穿了 64b/66b 往返）
+      - **判据脚本**：`scripts\udp_verify.py` —— payload 长度 26/27/28/29/30/31/32/33/40/63/100/200（覆盖 8 种 `帧长%8` 余数类别，专压帧尾不足 8 字节逻辑），逐字节比对 + 首差定位
+      - **待办**：上板跑（先 `ping 192.168.1.10`——ICMP 应答同样穿 Aurora，ping 通即链路全通）；上板验证单 = vault `操作文档/阶段二之八_Aurora_UDP数据级桥上板验证单_2026-09-10.md`
+      - ⚠️ **两条硬教训（已入 XDC 注释与设计说明）**：① **XDC 文件里不能用 `if`/`puts`/`foreach`** —— Vivado 的 XDC 只支持受限 Tcl 子集，实测报 `CRITICAL WARNING: [Designutils 20-1307]` 并**把整段约束静默丢弃**（不中断构建）；② **必须显式声明异步时钟组** —— 无共同祖先的时钟对 Vivado 也照做建立/保持分析，project_8 首轮 WNS=-2.661 ns 全部来自 Aurora 内部 `bufg_gt_clr_delayed→CLR`/`*cdc_to*` 与帧泵跨域指针（数据延时仅 0.3~0.4 ns，罚分几乎全是时钟插入延迟差），照搬官方 exdes 的 `set_clock_groups -asynchronous -group [get_clocks <clk> -include_generated_clocks]` + 两条 `set_false_path` 后即收敛
+      - ⚠️ **Aurora 64B/66B AXIS 约定（源码级定案，别凭 AXIS 直觉）**：第 1 字节 → `tdata[7:0]`；**末拍不足 8 字节时 tkeep 必须高位 lane 对齐** `~(8'hFF>>N)`（`F0/F8/FC/FE/E0/...`，**与常见 Xilinx AXIS 低位对齐 `0F` 相反**，喂 `0F` 会被当满 8 字节 → 收端多出垃圾字节）；`tlast` 每帧一个；`tready=0` 时须冻结；**RX 侧没有 tready**（IP 内部接 0）→ 消费端必须永远 ready。结论卡 = vault `Aurora64B66B_AXIS_接口约定结论.md`
+      - ⚠️ **ILA 分域铁律**：`u_pump_rev` 的**写侧**在 user_clk 域（只有读侧在 eth_rxc），故 `pump_rev_wr/drop` 必须挂 user_clk 的 ILA；挂错域 = 未同步采样路径（时序违规 + 只能抓到亚稳态值）
+    - ⏸️ 挂起：串口桥 M-D 验证（位流在库）；project_7 内环（C17 已修，定位=光口承载以太网前端）；万兆光电转路线（远期可选）
+    - 之后：DDR（MIG 位流在库）→ DMA 环回 → 双模式转发 → 板间 Aurora 干线（加板后）→ 多端点交换演进
 - ⚠️ **命名陷阱存档（2026-08-26 实录）**：IBERT/GT IP 界面用 Bank 号（QUAD_226）称呼 Quad；XDC 里 `226_TX3_P` 之类标注 = Bank 226 的 GT 通道，≠"第 226 号 site"。选 quad 前先确认 site 名落位（X1Y*）再开跑
 - 🎯 **阶段二（AXI 总线族）已启动（2026-08-12）**——里程碑口径沿用 vault：**M2 = SFP 收发+64b/66b 联调**，AXI 总线族是 M2 的前置阶段。目标：搞懂 MicroBlaze 的 AXI 接口与地址映射，能在 design_1 里对照实物讲解/修改总线结构。学习路线：① AXI4/AXI4-Lite/AXI4-Stream 三种协议 + 通道与 VALID/READY 握手 → ② 对照 design_1：microblaze_0 M_AXI_DP → axi_interconnect（地址译码）→ uartlite S_AXI（0x40600000）→ ③ 地址编辑器/软件读写寄存器验证 → ④ 动手实验：自定义 AXI-Lite IP（如 LED 寄存器）全流程走一遍。硬件侧流程不变（HW Manager 烧位流 + Vitis 取消 Program FPGA）
 - 📌 **M2 前置资料已备（2026-08-12）**：FMC_4SFP 四光口 GTH 定位完成（见 `FMC_4SFP_GTH引脚表.md`）——4 口共用 **GT Quad X1Y2**（X1Y8~X1Y11），MGTREFCLK=**P6/P5**（GTHE3_COMMON_X1Y3）；⚠️ SFP_CLK 频率待查（10G 需 156.25MHz）、控制信号引脚两版冲突待确认（子卡在改）；官方 KU_IO.xdc 无 GT 内容
@@ -72,7 +84,7 @@
   4. ⏭️ 8b/10b 环回实验（第 57 章）：实操单见 vault `操作文档/阶段二前置之二_8b10b环回实操单.md`
   5. 可选：`write_bd_tcl` 把 design_1.bd 固化成脚本（防工程丢失；Tcl 三件套已从远端找回，可参照改造）
 - 🎯 里程碑 M1：Vitis 导入硬件平台，**Hello World 串口打印**
-- 📚 参考（vault 内，用户转述）：`操作文档/阶段一_Vitis环境与MicroBlaze软核.md`（手把手教程）、`长期路线图_2026-08-31.md`（**整盘棋基准：原 5 阶段计划与实际执行的对账，含四处分歧决策记录**）、`8.3/2026-04-30/FPGA-SFP-communication-with-Aurora 项目详细介绍.md`（基线全貌）
+- 📚 参考（vault 内，用户转述）：`操作文档/阶段一_Vitis环境与MicroBlaze软核.md`（手把手教程）、`长期路线图_2026-09-04.md`（**整盘棋基准：原 5 阶段计划与实际执行的对账，含四处分歧决策记录**）、`8.3/2026-04-30/FPGA-SFP-communication-with-Aurora 项目详细介绍.md`（基线全貌）
 
 ## 工程结构
 
