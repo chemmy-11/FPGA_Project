@@ -111,9 +111,13 @@ always @(posedge wr_clk or negedge wr_rst_n) begin
         rd_done_t_s1  <= rd_done_t;
         rd_done_t_s2  <= rd_done_t_s1;
         rd_done_t_ack <= rd_done_t_s2;
+        // C20 修复(2026-09-10): wr_cnt 必须在两个分支都累加。
+        // 原实现只在 !hs_busy 分支累加，而 hs_busy 拉高的同一拍已把 wr_cnt 清零，
+        // 于是 busy 期间 wr_en_fall 时 wr_cnt 恒为 0 → 丢帧分支永不成立 →
+        // wr_drop_cnt 成了死计数器("drop=0" 不能证明没丢帧)。
+        if(wr_valid)
+            wr_cnt <= wr_cnt + 16'd1;
         if(!hs_busy) begin
-            if(wr_valid)
-                wr_cnt <= wr_cnt + 16'd1;
             if(wr_en_fall && wr_cnt != 16'd0) begin
                 frame_len_mb <= wr_cnt;
                 wr_done_t    <= ~wr_done_t;     // frame available -> toggle
@@ -139,7 +143,13 @@ end
 // read side: pointers (advance ONLY on actual reads) + pump FSM
 //=============================================================================
 assign rd_bin_next = rd_bin + 1'b1;
-assign rd_empty = (bin2gray(rd_bin_next) == wr_ptr_g_s2);
+// C21 修复(2026-09-17): rd_empty 必须用当前 rd_bin，不能用 rd_bin_next。
+//   原式 (bin2gray(rd_bin_next)==wr_ptr_g_s2) 是"提前一拍判空"：当读指针追到
+//   与写指针持平（rd_bin=末字节地址）时，rd_bin_next 已等于 wr_ptr，于是把
+//   **每帧最后一字节**误判为空而拒读（板上实测：第二帧恒少 1 字节、rd_frame_cnt
+//   停在 1、FSM 永久卡死）。本泵是"整帧先写满再读"，读期间写指针稳定，
+//   用 rd_bin 判空安全：rd_bin 追上 wr_ptr 才为空，末字节允许读出。
+assign rd_empty = (bin2gray(rd_bin) == wr_ptr_g_s2);
 
 always @(posedge rd_clk or negedge rd_rst_n) begin
     if(!rd_rst_n) begin

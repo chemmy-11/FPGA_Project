@@ -76,6 +76,7 @@ wire          udp_gmii_tx_en; wire [7:0] udp_gmii_txd;
 wire          rec_pkt_done, udp_rec_en;
 wire [7:0]    udp_rec_data;
 wire [15:0]   rec_byte_num, tx_byte_num;
+wire [15:0]   udp_src_port;               // P8: 发送方 UDP 源端口（回显目标端口）
 wire          udp_tx_done, udp_tx_req;
 wire [7:0]    udp_tx_data;
 wire          tx_start_en;
@@ -233,7 +234,12 @@ aurora_64b66b_0_support u_aurora (
 );
 
 //*******************************************************************
-// GMII <-> RGMII（官方）：RX 直连栈；TX 由帧泵回来的数据驱动
+// GMII <-> RGMII（官方原版；2026-09-10 回退"改动 D"）
+//   回退理由（以官方例程 + 官方 XDC 为板级基准）：
+//   阶段二之五实操单 C8 —— YT8531 的 RXD0_RXDLY / RXD1_TXDLY strap 上拉，
+//   RXC 相对 RXD 已由 PHY 内部居中（~2ns），**FPGA 侧不需要、也不应再加 IDELAY**。
+//   此前在 IDDRE1 前插的 IDELAYE3 一旦被按键推到非零 tap，等于给 RX 硬加延时，
+//   反而把本来正确的采样点推歪 —— 故整体回退到与官方逐字节一致的接法。
 //*******************************************************************
 gmii_to_rgmii u_gmii_to_rgmii (
     .gmii_rx_clk  (gmii_rx_clk),
@@ -314,6 +320,8 @@ udp #(
     .rec_en        (udp_rec_en   ),
     .rec_data      (udp_rec_data ),
     .rec_byte_num  (rec_byte_num ),
+    .rec_src_port  (udp_src_port ),   // P8: 捕获的发送方源端口
+    .des_port      (udp_src_port ),   // P8: 回显发给该端口（不再硬编码 1234）
     .tx_start_en   (tx_start_en  ),
     .tx_data       (udp_tx_data  ),
     .tx_byte_num   (tx_byte_num  ),
@@ -439,8 +447,18 @@ frame_fifo_pump u_pump_rev (
     .rd_frame_cnt (pump_rev_rd   )
 );
 
+`ifdef P8_TX_DIRECT
+// ===== 交叉验证变体（P8_TX_DIRECT）=====
+//   TX 直连：与官方 39 / project_6（已验证能通的"网口版"）的数据通路完全一致。
+//   Aurora 仍在设计里（链路照常建立、ILA 照常可抓），只是不进数据通路。
+//   判据：ping/UDP 通 => RX 侧没坏，坏在"栈TX→泵A→打包→Aurora→解包→泵B"这条绕行；
+//         仍不通 => RX 侧确实坏（与 ILA 抓到的字节损坏一致），需回到板级/实现层查。
+assign rgmii_txd_i   = stack_txd;
+assign rgmii_tx_en_i = stack_tx_en;
+`else
 assign rgmii_txd_i   = pump_rev_data;
 assign rgmii_tx_en_i = pump_rev_en;
+`endif
 
 //*******************************************************************
 // 观测 LED
@@ -485,5 +503,17 @@ assign led_link = channel_up;
 (* mark_debug = "true" *) wire [15:0] dbg_pfwd_drop = pump_fwd_drop;
 (* mark_debug = "true" *) wire [7:0]  dbg_stack_txd = stack_txd;
 (* mark_debug = "true" *) wire        dbg_stack_txen= stack_tx_en;
+// eth_rxc 域 · **接收侧**可见性（2026-09-10 加：排查"PC 发的包到底进没进 FPGA"）
+//   gmii_rx_dv   : PHY→FPGA 的 GMII 接收有效（有它 = 网线上的帧真的进来了）
+//   arp_rx_done  : 官方栈成功解析出一个 ARP 帧（有它 = 数据没被 CRC/格式判掉）
+//   udp/icmp_rec_done : UDP / ICMP 解析完成
+(* mark_debug = "true" *) wire        dbg_gmii_rx_dv   = gmii_rx_dv;
+(* mark_debug = "true" *) wire [7:0]  dbg_gmii_rxd     = gmii_rxd;
+(* mark_debug = "true" *) wire        dbg_arp_rx_done  = arp_rx_done;
+(* mark_debug = "true" *) wire        dbg_arp_rx_type  = arp_rx_type;
+(* mark_debug = "true" *) wire        dbg_udp_rec_done = rec_pkt_done;
+(* mark_debug = "true" *) wire        dbg_icmp_rec_done= icmp_rec_pkt_done;
+(* mark_debug = "true" *) wire [15:0] dbg_rec_byte_num = rec_byte_num;
+(* mark_debug = "true" *) wire [15:0] dbg_udp_src_port = udp_src_port;   // P8: 回显目标端口
 
 endmodule

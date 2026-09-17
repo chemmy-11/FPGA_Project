@@ -29,7 +29,8 @@ module udp_rx(
     output  reg          rec_pkt_done,    //以太网单包数据接收完成信号
     output  reg          rec_en      ,    //以太网接收的数据使能信号
 	output  reg  [7 :0]  rec_data    ,
-    output  reg  [15:0]  rec_byte_num     //以太网接收的有效字数 单位:byte     
+    output  reg  [15:0]  rec_byte_num,     //以太网接收的有效字数 单位:byte     
+    output  reg  [15:0]  rec_src_port     // P8: UDP source port
     );
 
 //parameter define
@@ -149,6 +150,7 @@ always @(posedge clk or negedge rst_n) begin
         rec_data <= 32'd0;
         rec_pkt_done <= 1'b0;
         rec_byte_num <= 16'd0;
+        rec_src_port <= 16'd1234;
     end
     else begin
         skip_en <= 1'b0;
@@ -225,6 +227,10 @@ always @(posedge clk or negedge rst_n) begin
             st_udp_head : begin
                 if(gmii_rx_dv) begin
                     cnt <= cnt + 5'd1;
+                    if(cnt == 5'd0)                        
+                        rec_src_port[15:8] <= gmii_rxd;   // P8: capture sender source port (high)
+                    else if(cnt == 5'd1)                   
+                        rec_src_port[7:0]  <= gmii_rxd;   // P8: capture sender source port (low)
                     if(cnt == 5'd4)
                         udp_byte_num[15:8] <= gmii_rxd;      //解析UDP字节长度 
                     else if(cnt == 5'd5)

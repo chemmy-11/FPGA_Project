@@ -113,7 +113,17 @@ set nets1 {}
 foreach n [bus_nets dbg_pfwd_wr   16] { lappend nets1 $n }
 foreach n [bus_nets dbg_pfwd_drop 16] { lappend nets1 $n }
 lappend nets1 [lindex [get_nets [list dbg_stack_txen]] 0]
-set_property port_width 33 [get_debug_ports u_ila_1/probe0]
+# ---- 接收侧（2026-09-10 加：定位"PC 发的包到底进没进 FPGA"）----
+lappend nets1 [lindex [get_nets [list dbg_gmii_rx_dv   ]] 0]
+foreach n [bus_nets dbg_gmii_rxd     8] { lappend nets1 $n }
+lappend nets1 [lindex [get_nets [list dbg_arp_rx_done ]] 0]
+lappend nets1 [lindex [get_nets [list dbg_arp_rx_type ]] 0]
+lappend nets1 [lindex [get_nets [list dbg_udp_rec_done]] 0]
+lappend nets1 [lindex [get_nets [list dbg_icmp_rec_done]] 0]
+foreach n [bus_nets dbg_rec_byte_num 16] { lappend nets1 $n }
+# ---- P8 回显目标端口 = 发送方源端口（2026-09-10 加）----
+foreach n [bus_nets dbg_udp_src_port 16] { lappend nets1 $n }
+set_property port_width 78 [get_debug_ports u_ila_1/probe0]
 connect_debug_port u_ila_1/probe0 $nets1
 
 # implement_debug_core 要求先保存设计 → 检查点保存/重开（论坛标准解法）

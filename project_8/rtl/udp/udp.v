@@ -33,12 +33,14 @@ module udp(
     output               rec_pkt_done, //以太网单包数据接收完成信号
     output               rec_en      , //以太网接收的数据使能信号
     output       [ 7:0]  rec_data    , //以太网接收的数据
-    output       [15:0]  rec_byte_num, //以太网接收的有效字节数 单位:byte     
+    output       [15:0]  rec_byte_num,
+    output       [15:0]  rec_src_port, // P8 UDP source port //以太网接收的有效字节数 单位:byte     
     input                tx_start_en , //以太网开始发送信号
     input        [ 7:0]  tx_data     , //以太网待发送数据  
     input        [15:0]  tx_byte_num , //以太网发送的有效字节数 单位:byte  
     input        [47:0]  des_mac     , //发送的目标MAC地址
-    input        [31:0]  des_ip      , //发送的目标IP地址    
+    input        [31:0]  des_ip      ,
+    input        [15:0]  des_port    , // P8 echo destination port //发送的目标IP地址    
     output               tx_done     , //以太网发送完成信号
     output               tx_req        //读数据请求信号    
     );
@@ -81,7 +83,8 @@ udp_rx
     .rec_pkt_done    (rec_pkt_done),      
     .rec_en          (rec_en      ),            
     .rec_data        (rec_data    ),          
-    .rec_byte_num    (rec_byte_num)       
+    .rec_byte_num    (rec_byte_num),
+    .rec_src_port    (rec_src_port)
     );                                    
 
 //以太网发送模块
@@ -100,6 +103,7 @@ udp_tx
     .tx_byte_num     (tx_byte_num),    
     .des_mac         (des_mac    ),
     .des_ip          (des_ip     ),    
+    .des_port        (des_port  ),
     .crc_data        (crc_data   ),          
     .crc_next        (crc_next[31:24]),
     .tx_done         (tx_done    ),           

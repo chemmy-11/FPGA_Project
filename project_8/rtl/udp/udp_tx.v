@@ -28,7 +28,8 @@ module udp_tx(
 	input        [ 7:0]  tx_data    , //以太网待发送数据 
     input        [15:0]  tx_byte_num, //以太网发送的有效字节数
     input        [47:0]  des_mac    , //发送的目标MAC地址
-    input        [31:0]  des_ip     , //发送的目标IP地址    
+    input        [31:0]  des_ip     ,
+    input        [15:0]  des_port    , // P8 echo destination port //发送的目标IP地址    
     input        [31:0]  crc_data   , //CRC校验数据
     input        [ 7:0]  crc_next   , //CRC下次校验完成数据
     output  reg          tx_done    , //以太网发送完成信号
@@ -261,7 +262,7 @@ always @(posedge clk or negedge rst_n) begin
                     else
                         ip_head[4] <= DES_IP;       
                         //16位源端口号：1234  16位目的端口号：1234                      
-                        ip_head[5] <= {16'd1234,16'd1234};  
+                        ip_head[5] <= {16'd1234,des_port};  // P8 dst port = sender port  
                         //16位udp长度，16位udp校验和              
                         ip_head[6] <= {udp_num,16'h0000};  
                         //更新MAC地址
