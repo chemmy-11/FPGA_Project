@@ -14,7 +14,7 @@ module rgmii_rx(
     output      [7:0]  gmii_rxd
 );
 
-parameter RX_DLY_PS = 500;          // 数据固定延迟(ps)
+parameter RX_DLY_PS = 1250;         // 数据固定延迟(ps)：500ps 实测 50% 通(眼边缘)，1250ps 居中
 
 wire         rgmii_rxc_bufg ;
 wire         rgmii_rxc_bufio;
