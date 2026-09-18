@@ -23,6 +23,17 @@ import_ip $proj_dir/ip/aurora_64b66b_0/aurora_64b66b_0.xci
 import_ip $proj_dir/ip/aurora_64b66b_0_reg_slice_0/aurora_64b66b_0_reg_slice_0.xci
 import_ip $proj_dir/ip/aurora_64b66b_0_reg_slice_2/aurora_64b66b_0_reg_slice_2.xci
 import_ip $proj_dir/ip/async_fifo_2048x8b/async_fifo_2048x8b.xci
+import_ip $proj_dir/ip/aurora_64b66b_1/aurora_64b66b_1.xci
+
+## ---- prj9: 回显弹性 FIFO（FWFT 同步 512x80b，fifo_generator）----
+create_ip -name fifo_generator -vendor xilinx.com -library ip -version 13.2 -module_name fifo_80b_echo
+set_property -dict [list \
+    CONFIG.Fifo_Implementation {Common_Clock_Block_RAM} \
+    CONFIG.Input_Data_Width {80} \
+    CONFIG.Input_Depth {512} \
+    CONFIG.Performance_Options {First_Word_Fall_Through} \
+    CONFIG.Enable_Safety_Circuit {false} \
+] [get_ips fifo_80b_echo]
 generate_target all [get_ips]
 
 ## ---- 约束 ----

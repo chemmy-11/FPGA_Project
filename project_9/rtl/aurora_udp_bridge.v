@@ -1,5 +1,5 @@
 //=============================================================================
-// aurora_udp_bridge.v — Aurora-UDP 数据级桥顶层（project_8）
+// aurora_udp_bridge.v — Aurora-UDP 数据级桥顶层（project_9 双笼版：A(Y11,X1Y11)↔B(Y9,X1Y9) 真光链路）
 //
 // 数据流（数据级 64b/66b 验证）:
 //   PC --RJ45(GE1,RGMII)--> [以太网栈] --回显帧--> 帧泵(CDC) --> 打包(8→64)
@@ -38,6 +38,14 @@ module aurora_udp_bridge (
     output             sfp_tx_disable,
     output             sfp_rs0    ,
     output             sfp_rs1    ,
+    // ---- GT-B (Aurora 64b/66b 第二通道, X1Y9 = 光口Y9 通道B) ----
+    input              sfpb_rx_p  ,
+    input              sfpb_rx_n  ,
+    output             sfpb_tx_p  ,
+    output             sfpb_tx_n  ,
+    output             sfpb_tx_disable,
+    output             sfpb_rs0   ,
+    output             sfpb_rs1   ,
     // ---- 观测 LED ----
     output             led_loop   ,
     output             led_link
@@ -120,13 +128,28 @@ wire [15:0]   pump_rev_wr, pump_rev_drop, pump_rev_rd;
 wire [15:0]   pack_frames;    wire pack_ovf;
 wire [15:0]   unpack_bytes, unpack_frames; wire unpack_ovf; wire [15:0] unpack_stall;
 
+// ---- prj9 双笼 B 通道连线（光口Y9 = GT X1Y9；user_clk_b 域）----
+wire sh_refclk, sh_qpllclk, sh_qpllrefclk, sh_qplllock, sh_qpllrefclklost;
+wire b_qpllreset;
+wire user_clk_b, sync_clk_b;
+wire channel_up_b, lane_up_b, hard_err_b, soft_err_b, gt_pll_lock_b;
+wire [63:0] b_rx_tdata; wire [7:0] b_rx_tkeep; wire b_rx_tlast, b_rx_tvalid;
+wire [63:0] b_tx_tdata; wire [7:0] b_tx_tkeep; wire b_tx_tlast, b_tx_tvalid, b_tx_tready;
+wire [79:0] echo_din, echo_dout;
+wire echo_full, echo_empty, echo_wr, echo_rd;
+wire [15:0] echo_drop_cnt;
+wire link_ok = channel_up & channel_up_b;   // 双通道都 up 才算真链路建立
+
 // 数据通路复位（user_clk 域）：系统复位 或 链路未建立
-wire aurora_rst = ~sys_rst_n | ~channel_up;
+wire aurora_rst = ~sys_rst_n | ~link_ok;   // prj9: A、B 双 channel_up 门控
 
 // ---- SFP 控制（内环模式功能不敏感；开激光、>4.25G 档）----
 assign sfp_tx_disable = 1'b0;
 assign sfp_rs0 = 1'b1;
 assign sfp_rs1 = 1'b1;
+assign sfpb_tx_disable = 1'b0;   // prj9: B 笼激光开
+assign sfpb_rs0 = 1'b1;
+assign sfpb_rs1 = 1'b1;
 
 // ---- DRP 悬空 ----
 assign drp_awaddr  = 32'h0;
@@ -172,7 +195,7 @@ assign pma_init = pma_init_stage[127];
 //*******************************************************************
 // Aurora 64b/66b 共享逻辑支撑（shared_logic/，例程同款）
 //*******************************************************************
-aurora_64b66b_0_support u_aurora (
+aurora_64b66b_0_support_ext u_aurora (   // prj9: _ext 版引出 refclk/QPLL 供 B 共享
     // TX AXI4-S
     .s_axi_tx_tdata  (tx_tdata ),
     .s_axi_tx_tlast  (tx_tlast ),
@@ -230,7 +253,79 @@ aurora_64b66b_0_support u_aurora (
     .mmcm_not_locked_out  (mmcm_not_locked_out),
     .bufg_gt_clr_out      (bufg_gt_clr_out),
     .sys_reset_out        (sys_reset_out),
-    .tx_out_clk           (tx_out_clk)
+    .tx_out_clk           (tx_out_clk),
+    // prj9 双笼共享引出（→ u_aurora_b）
+    .refclk1_out                 (sh_refclk),
+    .gt_qpllclk_quad1_out        (sh_qpllclk),
+    .gt_qpllrefclk_quad1_out     (sh_qpllrefclk),
+    .gt_qplllock_quad1_out       (sh_qplllock),
+    .gt_qpllrefclklost_quad1_out (sh_qpllrefclklost),
+    .ext_qpllreset_in            (b_qpllreset)
+);
+
+//*******************************************************************
+// prj9 双笼 B 通道（光口Y9 = GT X1Y9）：远端镜像 + 弹性回显
+//   数据渡光两次: A.TX →光→ B.RX →[FIFO 512x80]→ B.TX →光→ A.RX
+//   A 侧数据通路（泵/打包/解包）零改动，全部仍在 A 的 user_clk 域。
+//   B 的 TX 无应用数据时 Aurora 自动发 idle —— 维持 A 的 channel_up。
+//*******************************************************************
+assign echo_din      = {7'b0, b_rx_tlast, b_rx_tkeep, b_rx_tdata};
+assign echo_wr       = b_rx_tvalid & ~echo_full;
+assign b_tx_tdata    = echo_dout[63:0];
+assign b_tx_tkeep    = echo_dout[71:64];
+assign b_tx_tlast    = echo_dout[72];
+assign b_tx_tvalid   = ~echo_empty;
+assign echo_rd       = b_tx_tvalid & b_tx_tready;
+
+// 回显丢包计数（FIFO 满才丢 —— 匹配速率下物理上不应发生，供 ILA 观测）
+reg [15:0] echo_drop_r;
+always @(posedge user_clk_b) begin
+    if (aurora_rst)                    echo_drop_r <= 16'd0;
+    else if (b_rx_tvalid & echo_full)  echo_drop_r <= echo_drop_r + 16'd1;
+end
+assign echo_drop_cnt = echo_drop_r;
+
+aurora_64b66b_1_support_shared u_aurora_b (
+    .s_axi_tx_tdata  (b_tx_tdata ),
+    .s_axi_tx_tkeep  (b_tx_tkeep ),
+    .s_axi_tx_tlast  (b_tx_tlast ),
+    .s_axi_tx_tvalid (b_tx_tvalid),
+    .s_axi_tx_tready (b_tx_tready),
+    .m_axi_rx_tdata  (b_rx_tdata ),
+    .m_axi_rx_tkeep  (b_rx_tkeep ),
+    .m_axi_rx_tlast  (b_rx_tlast ),
+    .m_axi_rx_tvalid (b_rx_tvalid),
+    .rxp (sfpb_rx_p), .rxn (sfpb_rx_n),
+    .txp (sfpb_tx_p), .txn (sfpb_tx_n),
+    .hard_err   (hard_err_b  ),
+    .soft_err   (soft_err_b  ),
+    .channel_up (channel_up_b),
+    .lane_up    (lane_up_b   ),
+    .user_clk_out (user_clk_b),
+    .sync_clk_out (sync_clk_b),
+    .reset_pb     (reset_pb   ),
+    .loopback     (3'b000),          // 正常模式（真光链路）
+    .pma_init     (pma_init   ),
+    .init_clk     (init_clk   ),
+    .gt_pll_lock  (gt_pll_lock_b),
+    .refclk1_shared           (sh_refclk),
+    .gt_qpllclk_shared        (sh_qpllclk),
+    .gt_qpllrefclk_shared     (sh_qpllrefclk),
+    .gt_qplllock_shared       (sh_qplllock),
+    .gt_qpllrefclklost_shared (sh_qpllrefclklost),
+    .gt_to_common_qpllreset_out (b_qpllreset)
+);
+
+// 回显弹性 FIFO：FWFT 同步 FIFO 512x80b（fifo_generator）
+fifo_80b_echo u_echo_fifo (
+    .clk   (user_clk_b ),
+    .srst  (aurora_rst ),
+    .din   (echo_din   ),
+    .wr_en (echo_wr    ),
+    .full  (echo_full  ),
+    .dout  (echo_dout  ),
+    .rd_en (echo_rd    ),
+    .empty (echo_empty )
 );
 
 //*******************************************************************
@@ -471,7 +566,7 @@ always @(posedge user_clk) begin
     else if (rx_tvalid) led_loop_r <= 1'b1;
 end
 assign led_loop = led_loop_r;
-assign led_link = channel_up;
+assign led_link = link_ok;   // prj9: 双通道都 up 才点亮
 
 //*******************************************************************
 // ILA 探针（脚本化调试核插入）
@@ -515,5 +610,10 @@ assign led_link = channel_up;
 (* mark_debug = "true" *) wire        dbg_icmp_rec_done= icmp_rec_pkt_done;
 (* mark_debug = "true" *) wire [15:0] dbg_rec_byte_num = rec_byte_num;
 (* mark_debug = "true" *) wire [15:0] dbg_udp_src_port = udp_src_port;   // P8: 回显目标端口
+// prj9 双笼 B 通道（user_clk_b 域 —— 如挂 ILA 需用 B 域时钟，勿挂 A 域 ILA）
+(* mark_debug = "true" *) wire        dbg_ch_up_b     = channel_up_b;
+(* mark_debug = "true" *) wire        dbg_b_rx_tvalid = b_rx_tvalid;
+(* mark_debug = "true" *) wire        dbg_b_tx_tvalid = b_tx_tvalid;
+(* mark_debug = "true" *) wire [15:0] dbg_echo_drop   = echo_drop_cnt;
 
 endmodule

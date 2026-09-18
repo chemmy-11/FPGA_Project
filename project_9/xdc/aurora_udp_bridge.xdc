@@ -52,6 +52,11 @@ set_property -dict {PACKAGE_PIN AF12 IOSTANDARD LVCMOS33} [get_ports sfp_tx_disa
 set_property -dict {PACKAGE_PIN AF13 IOSTANDARD LVCMOS33} [get_ports sfp_rs0]
 set_property -dict {PACKAGE_PIN AE13 IOSTANDARD LVCMOS33} [get_ports sfp_rs1]
 
+## ---- SFP-B 控制脚（光口Y9 = 通道B = X1Y9；来源：官方 55_sfp_10g_loop XDC 注释）----
+set_property -dict {PACKAGE_PIN AH11 IOSTANDARD LVCMOS33} [get_ports sfpb_rs0]
+set_property -dict {PACKAGE_PIN AG11 IOSTANDARD LVCMOS33} [get_ports sfpb_rs1]
+set_property -dict {PACKAGE_PIN AH12 IOSTANDARD LVCMOS33} [get_ports sfpb_tx_disable]
+
 ## ---- 观测 LED（T22/T23）----
 set_property -dict {PACKAGE_PIN T22 IOSTANDARD LVCMOS18} [get_ports led_loop]
 set_property -dict {PACKAGE_PIN T23 IOSTANDARD LVCMOS18} [get_ports led_link]
@@ -84,5 +89,5 @@ set_clock_groups -asynchronous -group [get_clocks init_clk  -include_generated_c
 set_clock_groups -asynchronous -group [get_clocks gt_refclk -include_generated_clocks]
 
 # --- Aurora IP 内部 CDC 与 bufg_gt_clr 的例外（与 exdes 逐字一致）---
-set_false_path -quiet -to [get_pins -quiet -hier *aurora_64b66b_0_cdc_to*/D]
+set_false_path -quiet -to [get_pins -quiet -hier *aurora_64b66b_*_cdc_to*/D]   # prj9: 通配符覆盖 _0 与 _1 双核
 set_false_path -quiet -through [get_pins -quiet -hier *bufg_gt_clr_delayed_reg*/Q]
