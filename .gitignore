@@ -54,5 +54,9 @@ xvlog.pb
 xvlog.log
 tight_setup_hold_pins.txt
 
+# ===== 仿真/实验运行态（可再生）=====
+*.wdb
+xelab.pb
+
 # ===== 时序报告（每次构建可重新生成）=====
 *.rpt
