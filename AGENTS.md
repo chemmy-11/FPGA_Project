@@ -17,7 +17,7 @@
 1. **每步标注"为什么"**：用户答辩要讲得出原理，不允许只给结论不给解释
 2. **物理层归用户**：上板、SFP+ 光纤插拔、ILA 抓波形、示波器——你只写操作清单，不代劳
 3. **改动可追溯**：所有改动走 git（本工程已 git init），提交信息写清意图
-4. **目录权限（2026-08-27 修订）**：本工程目录 `D:\FPGA\` 与 vault `C:\Users\15266\Desktop\毕设\` 已**双向开放**——vault 知识库现位于 Reasonian 会话工作目录内，Reasonian 可直接读写 vault 文档；经用户授权也可直接操作本工程目录（改源文件/XDC、跑批处理等，改动须可追溯）。本文件仍是工程侧唯一事实源；同步约定不变（中枢视图由中控维护）
+4. **目录权限（2026-08-27 修订）**：本工程目录 `D:\FPGA\` 与 vault `C:\Users\***\Desktop\毕设\` 已**双向开放**——vault 知识库现位于 Reasonian 会话工作目录内，Reasonian 可直接读写 vault 文档；经用户授权也可直接操作本工程目录（改源文件/XDC、跑批处理等，改动须可追溯）。本文件仍是工程侧唯一事实源；同步约定不变（中枢视图由中控维护）
 5. **用户是 FPGA 新手**：遇到需要 GUI 理解的环节（第一次综合、看波形），明确提示用户去 GUI 看一遍建立直觉
 6. **工程路径全英文**：Vivado 命令行对中文路径乱码（实测）
 
@@ -63,11 +63,11 @@
     - 之后：DDR（MIG 位流在库）→ DMA 环回 → 双模式转发 → 板间 Aurora 干线（加板后）→ 多端点交换演进
 - ⚠️ **命名陷阱存档（2026-08-26 实录）**：IBERT/GT IP 界面用 Bank 号（QUAD_226）称呼 Quad；XDC 里 `226_TX3_P` 之类标注 = Bank 226 的 GT 通道，≠"第 226 号 site"。选 quad 前先确认 site 名落位（X1Y*）再开跑
 - 🎯 **阶段二（AXI 总线族）已启动（2026-08-12）**——里程碑口径沿用 vault：**M2 = SFP 收发+64b/66b 联调**，AXI 总线族是 M2 的前置阶段。目标：搞懂 MicroBlaze 的 AXI 接口与地址映射，能在 design_1 里对照实物讲解/修改总线结构。学习路线：① AXI4/AXI4-Lite/AXI4-Stream 三种协议 + 通道与 VALID/READY 握手 → ② 对照 design_1：microblaze_0 M_AXI_DP → axi_interconnect（地址译码）→ uartlite S_AXI（0x40600000）→ ③ 地址编辑器/软件读写寄存器验证 → ④ 动手实验：自定义 AXI-Lite IP（如 LED 寄存器）全流程走一遍。硬件侧流程不变（HW Manager 烧位流 + Vitis 取消 Program FPGA）
-- 📌 **M2 前置资料已备（2026-08-12）**：FMC_4SFP 四光口 GTH 定位完成（见 `FMC_4SFP_GTH引脚表.md`）——4 口共用 **GT Quad X1Y2**（X1Y8~X1Y11），MGTREFCLK=**P6/P5**（GTHE3_COMMON_X1Y3）；⚠️ SFP_CLK 频率待查（10G 需 156.25MHz）、控制信号引脚两版冲突待确认（子卡在改）；官方 KU_IO.xdc 无 GT 内容
+- 📌 **M2 前置资料已备（2026-08-12）**：FMC_4SFP 四光口 GTH 定位完成（见 `docs/参考_cross_FMC_4SFP_GTH引脚表_2026-08-27.md`）——4 口共用 **GT Quad X1Y2**（X1Y8~X1Y11），MGTREFCLK=**P6/P5**（GTHE3_COMMON_X1Y3）；⚠️ SFP_CLK 频率待查（10G 需 156.25MHz）、控制信号引脚两版冲突待确认（子卡在改）；官方 KU_IO.xdc 无 GT 内容
 - 🎉 **里程碑 M1 达成（2026-08-11 晚）**：Vitis 导入硬件平台 → Hello World 串口打印成功（COM7@9600）。最终流程：Vivado 出 bitstream（part=`xcku060-ffva1156-2-i`）→ HW Manager 手动烧录 → Vitis 更新 XSA 硬件规格 + **Run Configuration 取消 Program FPGA 勾选**（保留 Reset entire system）→ Run（MDM 下载程序）
 - 🧩 **M1 前全部故障根因复盘**：Vitis 报 `DONE PIN is not HIGH`（2023.1）/ `End of startup status: LOW`（2026.1）的**唯一根因 = part 选错**（`xcku060_CIV` 系学长教学视频参数，本板实物为非 CIV）。对照实验链：LED 冒烟（非 CIV part，成功）vs MicroBlaze（CIV part，失败）→ 位流头部 part 字段对比 → 定性。MODE=001、链路不稳、FT_Write=0 均为干扰项（次因/无关）。教训：教学视频参数 ≠ 实物，参数以实测为准
 
-- ✅ Vivado/Vitis **2023.1** 已装：`D:\Xilinx\Vivado\2023.1` + `D:\Xilinx\Vitis\2023.1`（2026.1 已卸载，迁移依据见 `2026.1_工作交接文档.md`）
+- ✅ Vivado/Vitis **2023.1** 已装：`D:\Xilinx\Vivado\2023.1` + `D:\Xilinx\Vitis\2023.1`（2026.1 已卸载，迁移依据见 `docs/阶段一_prj1_Vivado2026.1交接_2026-08-09.md`）
 - ✅ License：**ENTERPRISE**，有效期至 **2026-10-05**（`%APPDATA%\XilinxLicense\Xilinx.lic`，无需环境变量）
 - ✅ **板卡参数已确认**（2026-08-11 晚，实测修正）：
   - part = **`xcku060-ffva1156-2-i`（非 CIV 变体）**——铁证：CIV part 位流 Program 必报 startup LOW，非 CIV 位流成功且功能正常（LED 冒烟对照，2026-08-11 晚）；此前记录的 `xcku060_CIV` 为 2026.1 时代错误假设，**作废**（丝印核对无需再做，实测已定性）
@@ -77,7 +77,7 @@
 - ✅ **git 已建立并推送**（2026-08-12）：`D:\FPGA` 重新 git init（master 分支），首次提交 M1 成果 + 合并远端 `chemmy-11/FPGA_Project`（私有）既有历史 → 推送成功（HEAD=e7ed594）。**`scripts/` Tcl 三件套从远端历史找回**（create_project/bd_mb_minimal/build/env_check.tcl，原以为丢失）。注意：git 全局代理 127.0.0.1:7897（Clash 类工具），代理未开时用 `git -c http.proxy= -c https.proxy=` 直连推送；凭据走系统 GCM
 - ⚠️ `vivado_project/`（Tcl 骨架三件套）已移除且本地无历史，**但远端仓库保留**（scripts/ 已并入本仓库）——不再丢失
 - ⛔ **原阻塞已突破（2026-08-11 晚）**：最小设计（led.v：按键取反→LED，无时钟无 IP）经 Vivado Hardware Manager Program **成功**（`xcku060 is programmed`）→ **JTAG 配置链路本身是好的**。MODE=001 理论**排除**（UG570 明文：JTAG 配置与 MODE 引脚选择无关；GPT 建议.md 亦确认）。根因方向 = **JTAG 链路/Vitis 调用路径**（偶发失败 + FT_Write=0 + 此前 Vitis Program 必败而 HW Manager 成功）。下一步：确认频率因素 → HW Manager 烧 project_1 bitstream → Vitis 取消 Program FPGA 勾选直接下载程序（MDM 路径）→ M1
-- 📄 参考：`GPT建议.md`（外部 AI 诊断，2026-08-11 放根目录；含 UG570/UG908/UG912 引用与实验设计）
+- 📄 参考：`docs/参考_cross_JTAG启动失败诊断_GPT建议_2026-08-11.md`（外部 AI 诊断，原根目录 GPT建议.md；含 UG570/UG908/UG912 引用与实验设计）
 - ✅ **part 修正已验证**（2026-08-11 晚）：改 part 为 `xcku060-ffva1156-2-i`（非 CIV）重跑综合/实现/bitstream → **HW Manager 烧录成功**（`End of startup status: HIGH`）→ 原 CIV 假设彻底作废（源头：学长教学视频，非本板实物）
 - ⏳ 待办（下一步）：
   1. M2 第一步：打开 design_1 的 Address Editor 与 AXI Interconnect，对照讲解 AXI 协议基础（详见"阶段二已启动"条）
@@ -87,6 +87,18 @@
   5. 可选：`write_bd_tcl` 把 design_1.bd 固化成脚本（防工程丢失；Tcl 三件套已从远端找回，可参照改造）
 - 🎯 里程碑 M1：Vitis 导入硬件平台，**Hello World 串口打印**
 - 📚 参考（vault 内，用户转述）：`操作文档/阶段一_Vitis环境与MicroBlaze软核.md`（手把手教程）、`长期路线图_2026-09-04.md`（**整盘棋基准：原 5 阶段计划与实际执行的对账，含四处分歧决策记录**）、`8.3/2026-04-30/FPGA-SFP-communication-with-Aurora 项目详细介绍.md`（基线全貌）
+
+## 文档规范（docs/ · 2026-09-19 定）
+
+仓库文档统一放 `docs/`，命名格式：**`[阶段]_prj标识_概要_YYYY-MM-DD.md`**（下划线连接、禁空格）。
+
+- **阶段**（所处阶段）：`阶段一` / `阶段二前置` / `阶段二之三`…`阶段二之八` / `阶段三`（沿用任务分工与路线图口径）；`前置`（无阶段归属的认知准备）/ `参考`（无阶段归属的技术参考）/ `里程碑`（里程碑总结）
+- **prj标识**：`prj1`…`prj9` = `project_N`；`ibert` / `aurora-ex` = 非 prj 编号的例程工程（ibert_ultrascale_gth_0 / aurora_64b66b_loop_ex）；`cross` = 跨工程通用
+- **概要**：≤15 字短词（中文或英文）
+- **日期**：定稿日期 `YYYY-MM-DD`（取 frontmatter `created`；原文件名已含日期的沿用）
+- 豁免：目录级索引 `README.md`、非 Markdown 数据文件（`KU引脚表.xlsx`）
+- 知识库 `操作文档` 快照入 `docs/操作文档/` 时**须脱敏**（本机用户名路径 `C:\Users\15266\` → `C:\Users\***\`；第三方人名 → `前辈`）；vault 为权威版本，快照是只读副本，随阶段推进定期刷新
+- 新旧文件名映射与完整索引：`docs/README.md`
 
 ## 工程结构
 
@@ -98,9 +110,8 @@ D:\FPGA\
 │   ├── project_1.runs/    # synth_1（完成）/ impl_1（待跑）
 │   └── project_1.gen/     # 生成物（wrapper、IP 网表）
 ├── KU_IO.xdc              # 官方板卡 IO 引脚表（GBK 编码；时钟 100MHz 差分 AK17、复位 AC34、UART AE33/AF34）
-├── KU引脚表.xlsx
-├── test/                  # 旧测试工程（2026-08-07，已废弃）
-└── *.md                   # 交接/协作文档（2026.1_工作交接文档.md 等）
+├── docs/                  # 文档中心：操作文档脱敏快照 + 交接/参考/里程碑文档（命名规范见「文档规范」）
+└── test/                  # 旧测试工程（2026-08-07，已废弃）
 ```
 
 - `vivado_project/`、`vitis_project/` 已移除（2026-08-11 前）；Vitis 阶段工作区届时 GUI 新建即可

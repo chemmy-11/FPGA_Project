@@ -27,7 +27,7 @@
 
 ## 2. 管脚约束(最关键的成果,来自官方 KU_IO.xdc)
 
-**官方文件位置**:`C:\Users\15266\Desktop\操作相关\3_开发板原理图及硬件相关\KU_IO.xdc`
+**官方文件位置**:`C:\Users\***\Desktop\操作相关\3_开发板原理图及硬件相关\KU_IO.xdc`
 ⚠️ 该文件是 **GBK 编码**,用 Python 读取,别用 grep(Git Bash grep 会当成二进制返回空)。
 
 ### 最终管脚表(已验证正确)
@@ -149,7 +149,7 @@ int main()
 
 ### Vitis 运行配置
 - Run 配置里**必须配 Bitstream File**(否则找不到 FPGA)
-- 工作空间:`C:\Users\15266\Desktop\FPGA_Project\vitis_project\project_1\`(应用名 hallo_world)
+- 工作空间:`C:\Users\***\Desktop\FPGA_Project\vitis_project\project_1\`(应用名 hallo_world)
 
 ---
 
@@ -195,11 +195,11 @@ int main()
 
 | 文件 | 位置 |
 |---|---|
-| 官方管脚约束(权威) | `C:\Users\15266\Desktop\操作相关\3_开发板原理图及硬件相关\KU_IO.xdc`(GBK) |
+| 官方管脚约束(权威) | `C:\Users\***\Desktop\操作相关\3_开发板原理图及硬件相关\KU_IO.xdc`(GBK) |
 | 手写管脚约束 | `D:\FPGA\test\project_1\project_1.srcs\constrs_1\pins.xdc` |
 | bitstream | `D:\FPGA\test\project_1\project_1.runs\impl_1\design_1_wrapper.bit`(24MB 未压缩) |
 | flash bin(未压缩,24MB 放不下) | `D:\FPGA\test\project_1\design_1_wrapper_flash.bin` / `_spix4.bin` |
 | License 备份 | `D:\FPGA\Xilinx_license_backup.lic`(2023.1 激活用) |
-| 应用源码 | `C:\Users\15266\Desktop\FPGA_Project\vitis_project\project_1\hallo_world\main.c` |
-| 协作中枢 | `C:\Users\15266\Desktop\毕设\Agent 协作\AI协作中枢.md` |
-| 工程侧指令 | `C:\Users\15266\Desktop\FPGA_Project\AGENTS.md` |
+| 应用源码 | `C:\Users\***\Desktop\FPGA_Project\vitis_project\project_1\hallo_world\main.c` |
+| 协作中枢 | `C:\Users\***\Desktop\毕设\Agent 协作\AI协作中枢.md` |
+| 工程侧指令 | `C:\Users\***\Desktop\FPGA_Project\AGENTS.md` |

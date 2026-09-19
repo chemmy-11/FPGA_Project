@@ -18,7 +18,7 @@
 
 **project_9 · 真光链路版（Aurora 去 3'b010 内环）**
 - 单笼版（X1Y11）：首版位流 WNS=+0.936ns
-- **双笼版（A↔B 真光链路）**：A=Y11=X1Y11 + B=Y9=X1Y9（引脚见 `FMC_4SFP_GTH引脚表.md`）；克隆 Aurora IP → `aurora_64b66b_1`；B 侧远端镜像 + 512×80b FWFT 回显 FIFO，**数据渡光两次**（A.TX→B.RX→FIFO→B.TX→A.RX），A 侧数据通路零改动；位流 `out/aurora_udp_bridge.bit`（WNS=+1.008ns）
+- **双笼版（A↔B 真光链路）**：A=Y11=X1Y11 + B=Y9=X1Y9（引脚见 `docs/参考_cross_FMC_4SFP_GTH引脚表_2026-08-27.md`）；克隆 Aurora IP → `aurora_64b66b_1`；B 侧远端镜像 + 512×80b FWFT 回显 FIFO，**数据渡光两次**（A.TX→B.RX→FIFO→B.TX→A.RX），A 侧数据通路零改动；位流 `out/aurora_udp_bridge.bit`（WNS=+1.008ns）
 - **待办（物理层归用户）**：两个 10G 模块插 A/B 两笼，LC 跳线直连 → 烧双笼版位流 → T23（link_ok=channel_up_a&channel_up_b）常亮 → ping/udp_verify 同 M2 判据；T23 不亮先把一端两纤对调。仅一个模块时插 A + LC 自环头走单笼自环。
 
 ## 工程索引（状态一览）
@@ -56,8 +56,9 @@
 | `project_3/` | Aurora IP 主工程（64b/66b 定版 xci：10G duplex X1Y11） |
 | `0DMA_uart2ddr/` | 旧 DMA 实验（DDR 搁置期间预研） |
 | `scripts/` | Tcl 骨架三件套：create_project / bd_mb_minimal / build / env_check |
-| `KU_IO.xdc` `KU引脚表.xlsx` | 官方板卡引脚表（GBK 编码；时钟 AK17 差分 / 复位 AC34） |
-| `FMC_4SFP_GTH引脚表.md` | FMC 四光口引脚速查（GT Quad X1Y2：A=X1Y11、B=X1Y9、C=X1Y10、D=X1Y8；控制脚版本 A） |
+| `KU_IO.xdc`（根） · `docs/KU引脚表.xlsx` | 官方板卡引脚表（GBK 编码；时钟 AK17 差分 / 复位 AC34） |
+| `docs/参考_cross_FMC_4SFP_GTH引脚表_2026-08-27.md` | FMC 四光口引脚速查（GT Quad X1Y2：A=X1Y11、B=X1Y9、C=X1Y10、D=X1Y8；控制脚版本 A） |
+| `docs/` | **文档中心**：操作文档脱敏快照（含挂起区）+ 交接/参考/里程碑文档；命名规范 `[阶段]_prj标识_概要_YYYY-MM-DD`（见 `docs/README.md` 与 `AGENTS.md`「文档规范」） |
 
 ## 硬件基线（实测定论）
 
