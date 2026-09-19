@@ -1,9 +1,0 @@
-project_9: 真光链路版 —— loopback 3'b010(内环) -> 3'b000(正常), 首版位流 WNS=+0.936ns
-
-从 prj8(M2 判据全过) 复制验证过的资产: 官方栈+双帧泵+打包/解包+IDELAY1250ps 的 rgmii_rx_fix2;
-剔除死实验文件(rgmii_rx.v 官方原件/fix.v PlanA/_dly 两个)防同名模块冲突.
-
-真链路要素: Aurora 10Gbps(C_LINE_RATE=10000), sfp_tx_disable=0 开激光, rs0=rs1=1 高速档.
-预期行为: 无光模块/无环回时 T23 灭(channel_up=0, 帧泵硬门控, 板子静默=正常);
-插 10G SFP+ 并自环后 T23 常亮 -> ping/udp_verify 与 prj8 同判据.
-后续计划: 连通性过后加 IBERT 眼图(IBERT 与 Aurora 不能共占同一 GT, 用换装方案或同 quad 空闲通道).
