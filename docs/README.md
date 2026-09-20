@@ -23,7 +23,7 @@
 | 概要 | ≤15 字短词 | 中文或英文，去掉空格 |
 | 日期 | `YYYY-MM-DD` | 定稿日期：取 frontmatter `created`；原文件名已含日期的沿用 |
 
-豁免：目录级索引 `README.md` 与非 Markdown 数据文件（如 `KU引脚表.xlsx`）不受此规范约束。
+豁免：目录级索引 `README.md`、vault 会话入口 `agent.md`（`AGENTS.md` 的镜像摘要，冲突以 AGENTS.md 为准）与非 Markdown 数据文件（如 `KU引脚表.xlsx`）不受此规范约束。
 示例：`阶段二之八_prj8_数据级桥上板验证单_2026-09-10.md`。
 
 ## 文件索引（本仓库文件 ↔ vault 曾用名）
