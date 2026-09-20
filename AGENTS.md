@@ -1,133 +1,149 @@
-# AGENTS.md — FPGA_Project 工程指令（开发层，工作区 D:\FPGA）
+# AGENTS.md — FPGA_Project 工程指令与规范（开发层，工作区 D:\FPGA）
 
-> 本文件是 Reasonix（VSCode ACP 开发层）的**常驻指令**，每次会话自动加载。
-> 你是工程状态的**唯一事实源**（契约约定，见 vault `Agent 协作/开发协作文档.md`，用户转达）。
-> vault 中枢 `Agent 协作/AI协作中枢.md` 是中控维护的同步视图，**可能滞后——以你实测为准**。
+> 本文件是开发层 Agent 的**常驻指令 + 工程规范汇总**（2026-09-18 重构：原「角色契约+滚动状态」改为「契约+规范沉淀」）。
+> 你是工程状态的**唯一事实源**（契约见 vault `Agent 协作/开发协作文档.md`，用户转达）。
+> 工程进度总览看 `README.md`；本文件管**怎么干活**。
 
-## 角色定位
+## 一、角色与红线
 
-你是毕设 FPGA 开发层的**执行 Agent**，工程状态的**唯一事实源**。三层分工 + 中控（契约：vault 开发协作文档）：
-- **Reasonian（Obsidian）＝规划层/第二大脑**：管知识库、待办、方向、成果沉淀。vault 唯一写者。
-- **你（VSCode）＝开发层**：管本工程。工程目录唯一写者。状态以你实测为准，主动如实汇报。
-- **Reasonix（桌面端）＝协调中控**：任务路由、同步中枢↔本文件、状态看板、复杂任务/杂活兜底。你只需向用户汇报状态，同步由中控负责。
-- **多会话约定**（中枢 §5.6，2026-08-07 立）：桌面端可能多会话并存，同一时间仅**一个活跃中控**（「协调中控」topic）；多个中控会话向你问状态时如实汇报即可，状态出入一律以你实测为准
+### 角色分工（不变）
+- **Reasonian（Obsidian）＝规划层**：vault 唯一写者（知识库/待办/方向）。
+- **你（开发层）＝工程目录唯一写者**：状态以实测为准，主动如实汇报。
+- **Reasonix（桌面端）＝协调中控**：任务路由、同步中枢↔本文件。同一时间仅一个活跃中控。
 
-## 硬红线（必须遵守）
+### 硬红线
+1. **每步标注「为什么」**——用户答辩要讲得出原理，不允许只给结论。
+2. **物理层归用户**：上板、光纤插拔、看示波器——你写操作清单并给出判读表，不代劳。
+3. **改动可追溯**：一切改动走 git，提交信息写清意图与证据；位流/日志不入库（.gitignore）。
+4. **工程路径全英文**：Vivado 对中文路径乱码（GBK 实证）。vault 文档中文没问题，Vivado Tcl 引用的路径必须 ASCII。
+5. **用户是 FPGA 新手**：首次 GUI 环节（综合/看波形）提示用户亲自走一遍建立直觉。
+6. ** vault 与工程目录双向开放**：改 vault 文档可以，但 vault 为权威版本、工程内只放脱敏快照。
 
-1. **每步标注"为什么"**：用户答辩要讲得出原理，不允许只给结论不给解释
-2. **物理层归用户**：上板、SFP+ 光纤插拔、ILA 抓波形、示波器——你只写操作清单，不代劳
-3. **改动可追溯**：所有改动走 git（本工程已 git init），提交信息写清意图
-4. **目录权限（2026-08-27 修订）**：本工程目录 `D:\FPGA\` 与 vault `C:\Users\***\Desktop\毕设\` 已**双向开放**——vault 知识库现位于 Reasonian 会话工作目录内，Reasonian 可直接读写 vault 文档；经用户授权也可直接操作本工程目录（改源文件/XDC、跑批处理等，改动须可追溯）。本文件仍是工程侧唯一事实源；同步约定不变（中枢视图由中控维护）
-5. **用户是 FPGA 新手**：遇到需要 GUI 理解的环节（第一次综合、看波形），明确提示用户去 GUI 看一遍建立直觉
-6. **工程路径全英文**：Vivado 命令行对中文路径乱码（实测）
+## 二、事实源与第一性原则（本工程最高规范）
 
-## 硬件与基线（不可改）
-
-- **板卡**：Kintex UltraScale **XCKU060**（GTH 收发器、板载 DDR4 **4GB** = 4×MT40A512M16（8Gb x16/片，DDR4-2400 capable，64-bit 单 Rank，BANK 44/45/46；2026-08-31 丝印+拓扑图+原理图确认）、**无硬核 ARM**）
-- **开发方案**：以 **MicroBlaze 软核**替代基线工程（ZCU102）的 PS 硬核
-- **基线工程**：GitHub `FPGA-SFP-communication-with-Aurora`（DDR→DMA→Aurora 64b/66b→SFP+ 全链路）
-- **应用场景**：多 Agent（树莓派/笔记本/服务器部署不同规模模型）经 FPGA 交换数据协同推理，参考 MoA 架构（ICLR 2025）
-- **双工作模式**：缓存转发（先缓存后发） + 直通转发（交换功能）——导师会议确定
-
-## 技术路线（5 阶段）
-
-1. 软硬件协同流程（MicroBlaze 软核 + Vitis）← **当前**
-2. AXI 总线族
-3. DDR4/MIG
-4. AXI DMA + 中断
-5. Aurora/GTH（SFP 收发 + 64b/66b 编解码）
-
-## 当前任务（2026-08-31，M2 进行中）
-
-- 🎉 **Aurora 64b/66b 链路验证通过（2026-08-31）**——Aurora IP（v12.0，duplex/framing/单 lane/64-bit UI/QPLL1 FBDIV=64→10.000G 精确解，xci+生成 RTL 双重终验）例程上板：因实验室现有光纤接法为跨口互连（IBERT 四通道专用，单通道 duplex 不适用），采用**近端 PMA 内部串行环回**（`loopback_i=3'b010`），ILA 实测 `channel_up=1`、`lane_up=1`、`hard/soft_err=0`、`data_err_count=0`、`rx_tvalid=1`，板载状态灯 T22/T23（CHANNEL_UP/LANE_UP）点亮。物理层证据 = IBERT 外环真实光路（2026-08-27）；"Aurora 数据跑真实光纤"证据待联合调试阶段自然产生。工程留档：`D:\FPGA\aurora_64b66b_loop_ex\`（例程，exdes 补丁=LED T22/T23 + init_clk AK17/AK16 + 复位内部拉零 + sfp 版本 A 控制 + mark_debug×7）+ `D:\FPGA\project_3\`（IP 主工程）。实操单 = vault `操作文档/阶段二之三_Aurora64b66b环回实操单.md`。**下一步：AXI 总线族（design_1 活教材）→ Aurora framing 集成 → MIG/DDR4 → DMA → 联合调试**
-- 🎉 **IBERT 光口物理链路自检通过（2026-08-27）**——FMC 四光口首口（SFPA）单口光纤自环，IBERT 10G PRBS 板级验证成功：**PLL Locked + Errors=0E0**。三项硬件事实就此定案（回填 vault 实操单）：
-  1. **QUAD_226 = Quad X1Y2**（通道 X1Y8~Y11）——手册"X0Y2"系笔误，以实现落位报告为准；
-  2. **光口参考时钟 = MGTREFCLK1_226（T6/T5）@156.25MHz**——CLK0(V6/V5) 不锁、CLK1 锁，实测+手册原文（"226_CLK1_P 对应光口外部输入时钟"）双重定案；
-  3. **控制信号引脚 = 版本 A**（TX_DIS=H26/AH12/J25/AF12、RS0=G27/AH11/M26/AF13、RS1=H27/AG11/M25/AE13，索引 0~3=SFPD/B/C/A）——指南 XDC = 引脚表工作表1 = io_placed 报告三方一致。
-  - 工程留档：例程工程 `D:\FPGA\ibert_ultrascale_gth_0\ibert_ultrascale_gth_0_ex\`（IBERT exdes，顶层含 sfp 控制补丁 + 版本 A XDC）；`project_2` 主工程可归档。眼图截图待归档 `ibert_eye_test\docs\`
-  - ⏸️ **MIG/DDR4 搁置（2026-08-31 导师指示）**：位流已产出（`project_4`，含自研 AXI4 主机验证载体；DDR4 实况=4×MT40A512M16/4GB/DDR4-2400/BANK44-46）、定版卡完备，待解冻收尾（上板校准+比对）
-  - ▶️ **当前步 = 架构定版后的短期目标（路线图决策 #10，2026-09-04 更新）**：**端点/上位机 = 标准以太网（千兆）；Aurora 64b/66b = 板间干线**（加板后启用）。
-    - **① 上位机以太网传输 ✅（09-04 闭环）**：`project_6`（官方 39_eth_udp_loop 整包移植）上板验证通过——ping / UDP 回环 / Wireshark 四包链，pcapng 归档 `project_6\docs\`
-    - **② Aurora 数据级桥（短期目标②，2026-09-10 位流就绪）**：PC UDP 实际数据经 Aurora 64b/66b 内环往返的**数据级**传输验证 —— 区别于 08-31 的链路层自测
-      - **工程**：`D:\FPGA\project_8`（官方 39 栈 15 文件 + Aurora 共享逻辑 7 文件 + 2×reg_slice IP + 新增 `axis_word_pack/unpack` + 帧泵双向复用）；`create_project.tcl` / `build_debug.tcl` 幂等；设计说明 `docs\设计说明_Aurora_UDP数据级桥.md`
-      - **位流**：`out/aurora_udp_bridge.bit` —— **时序收敛 WNS=+1.062 ns**（"All user specified timing constraints are met"）、DRC 0 错、双 ILA（ILA0@user_clk / ILA1@eth_rxc）、布线后检查点 `scripts/post_route.dcp`、探针 `scripts/probes.ltx`
-      - **架构定版（与原方案的一处改动）**：Aurora **只插在「栈 TX → PC」单向路径**（回显帧 dst=请求方 MAC 天然不重入栈 → 自终止，不需要第二例 udp_rx）；帧泵读侧被 `~channel_up` **硬门控** → Aurora 没起来板卡对外完全不说话 → **判据无旁路**（`P′==P` 只可能来自真的穿了 64b/66b 往返）
-      - **判据脚本**：`scripts\udp_verify.py` —— payload 长度 26/27/28/29/30/31/32/33/40/63/100/200（覆盖 8 种 `帧长%8` 余数类别，专压帧尾不足 8 字节逻辑），逐字节比对 + 首差定位
-      - **待办**：上板跑（先 `ping 192.168.1.10`——ICMP 应答同样穿 Aurora，ping 通即链路全通）；上板验证单 = vault `操作文档/阶段二之八_Aurora_UDP数据级桥上板验证单_2026-09-10.md`
-      - ⚠️ **两条硬教训（已入 XDC 注释与设计说明）**：① **XDC 文件里不能用 `if`/`puts`/`foreach`** —— Vivado 的 XDC 只支持受限 Tcl 子集，实测报 `CRITICAL WARNING: [Designutils 20-1307]` 并**把整段约束静默丢弃**（不中断构建）；② **必须显式声明异步时钟组** —— 无共同祖先的时钟对 Vivado 也照做建立/保持分析，project_8 首轮 WNS=-2.661 ns 全部来自 Aurora 内部 `bufg_gt_clr_delayed→CLR`/`*cdc_to*` 与帧泵跨域指针（数据延时仅 0.3~0.4 ns，罚分几乎全是时钟插入延迟差），照搬官方 exdes 的 `set_clock_groups -asynchronous -group [get_clocks <clk> -include_generated_clocks]` + 两条 `set_false_path` 后即收敛
-      - ⚠️ **Aurora 64B/66B AXIS 约定（源码级定案，别凭 AXIS 直觉）**：第 1 字节 → `tdata[7:0]`；**末拍不足 8 字节时 tkeep 必须高位 lane 对齐** `~(8'hFF>>N)`（`F0/F8/FC/FE/E0/...`，**与常见 Xilinx AXIS 低位对齐 `0F` 相反**，喂 `0F` 会被当满 8 字节 → 收端多出垃圾字节）；`tlast` 每帧一个；`tready=0` 时须冻结；**RX 侧没有 tready**（IP 内部接 0）→ 消费端必须永远 ready。结论卡 = vault `Aurora64B66B_AXIS_接口约定结论.md`
-      - ⚠️ **ILA 分域铁律**：`u_pump_rev` 的**写侧**在 user_clk 域（只有读侧在 eth_rxc），故 `pump_rev_wr/drop` 必须挂 user_clk 的 ILA；挂错域 = 未同步采样路径（时序违规 + 只能抓到亚稳态值）
-      - ⚠️ **首轮上板失败与修复（09-10 实录 + 方法论）**：现象 = 两灯亮（channel_up=1、Aurora 收到过数据）+ ping 不通 → 用**闭环仿真**定位（`sim/tb_pack_unpack.v`：pack → 小 FIFO → 随机 tvalid 空洞 → unpack；判据与板上**同构**——输出出现空拍即视为帧尾）。三个缺陷：① "边收边吐"在 Aurora RX 流水线延迟下**必然抽干缓冲**（34 帧收回 77 段、stall=40）→ 改**整帧存储转发**；② 末拍按 lane 扫描、keep=0 就跳过 → **帧中间留 7 拍空拍**（9 字节帧被切成 8+1，与板上现象吻合）→ 改 popcount 连续吐字节；③ **XSim 对函数内 `for` 循环按升序求值**（`lowidx8` 返回最高位而非最低位 → 每帧末字节跑到帧首）→ 改无循环优先链。修复后仿真 34 帧全对（1~1000 字节、覆盖全部 `帧长%8` 余数）。**教训：输出流的"空拍"是语义信息（下游帧泵靠边沿判帧尾），上游必须给结构性保证，不能依赖"通常不会发生"；协议边界先在仿真里钉死再上板。**
-      - ⚠️ **ILA 报 "Use the Refresh Device command with a valid Probes file" 的解法**：把 `scripts/probes.ltx` 关联到**设备**再刷新 —— `scripts/ila_load_probes.tcl` 一键完成（GUI：选中器件 → Properties → Probes File 与 Full Probes File 都选该 ltx → 右键 Refresh Device）
-    - ⏸️ 挂起：串口桥 M-D 验证（位流在库）；project_7 内环（C17 已修，定位=光口承载以太网前端）；万兆光电转路线（远期可选）
-    - 之后：DDR（MIG 位流在库）→ DMA 环回 → 双模式转发 → 板间 Aurora 干线（加板后）→ 多端点交换演进
-- ⚠️ **命名陷阱存档（2026-08-26 实录）**：IBERT/GT IP 界面用 Bank 号（QUAD_226）称呼 Quad；XDC 里 `226_TX3_P` 之类标注 = Bank 226 的 GT 通道，≠"第 226 号 site"。选 quad 前先确认 site 名落位（X1Y*）再开跑
-- 🎯 **阶段二（AXI 总线族）已启动（2026-08-12）**——里程碑口径沿用 vault：**M2 = SFP 收发+64b/66b 联调**，AXI 总线族是 M2 的前置阶段。目标：搞懂 MicroBlaze 的 AXI 接口与地址映射，能在 design_1 里对照实物讲解/修改总线结构。学习路线：① AXI4/AXI4-Lite/AXI4-Stream 三种协议 + 通道与 VALID/READY 握手 → ② 对照 design_1：microblaze_0 M_AXI_DP → axi_interconnect（地址译码）→ uartlite S_AXI（0x40600000）→ ③ 地址编辑器/软件读写寄存器验证 → ④ 动手实验：自定义 AXI-Lite IP（如 LED 寄存器）全流程走一遍。硬件侧流程不变（HW Manager 烧位流 + Vitis 取消 Program FPGA）
-- 📌 **M2 前置资料已备（2026-08-12）**：FMC_4SFP 四光口 GTH 定位完成（见 `docs/参考_cross_FMC_4SFP_GTH引脚表_2026-08-27.md`）——4 口共用 **GT Quad X1Y2**（X1Y8~X1Y11），MGTREFCLK=**P6/P5**（GTHE3_COMMON_X1Y3）；⚠️ SFP_CLK 频率待查（10G 需 156.25MHz）、控制信号引脚两版冲突待确认（子卡在改）；官方 KU_IO.xdc 无 GT 内容
-- 🎉 **里程碑 M1 达成（2026-08-11 晚）**：Vitis 导入硬件平台 → Hello World 串口打印成功（COM7@9600）。最终流程：Vivado 出 bitstream（part=`xcku060-ffva1156-2-i`）→ HW Manager 手动烧录 → Vitis 更新 XSA 硬件规格 + **Run Configuration 取消 Program FPGA 勾选**（保留 Reset entire system）→ Run（MDM 下载程序）
-- 🧩 **M1 前全部故障根因复盘**：Vitis 报 `DONE PIN is not HIGH`（2023.1）/ `End of startup status: LOW`（2026.1）的**唯一根因 = part 选错**（`xcku060_CIV` 系学长教学视频参数，本板实物为非 CIV）。对照实验链：LED 冒烟（非 CIV part，成功）vs MicroBlaze（CIV part，失败）→ 位流头部 part 字段对比 → 定性。MODE=001、链路不稳、FT_Write=0 均为干扰项（次因/无关）。教训：教学视频参数 ≠ 实物，参数以实测为准
-
-- ✅ Vivado/Vitis **2023.1** 已装：`D:\Xilinx\Vivado\2023.1` + `D:\Xilinx\Vitis\2023.1`（2026.1 已卸载，迁移依据见 `docs/阶段一_prj1_Vivado2026.1交接_2026-08-09.md`）
-- ✅ License：**ENTERPRISE**，有效期至 **2026-10-05**（`%APPDATA%\XilinxLicense\Xilinx.lic`，无需环境变量）
-- ✅ **板卡参数已确认**（2026-08-11 晚，实测修正）：
-  - part = **`xcku060-ffva1156-2-i`（非 CIV 变体）**——铁证：CIV part 位流 Program 必报 startup LOW，非 CIV 位流成功且功能正常（LED 冒烟对照，2026-08-11 晚）；此前记录的 `xcku060_CIV` 为 2026.1 时代错误假设，**作废**（丝印核对无需再做，实测已定性）
-  - 板载晶振 = **100MHz 差分**（与官方 `KU_IO.xdc` 第 5 行 `create_clock -period 10.000` 一致；旧默认"200MHz 单端"作废）
-- ✅ **新 GUI 工程 `D:\FPGA\project_1`**（2026-08-11 建，Vivado 2023.1）：BD `design_1` = MicroBlaze 最小系统（Local Memory 64KB + AXI UART Lite **9600 波特率** + AXI Interconnect + MDM + clk_wiz 100MHz 差分输入 + rst_clk_wiz_1_100M）；**综合已通过**（0 错误，7 个 LMB/复位未连接类无害警告）
-- ✅ 约束已进工程：`project_1/project_1.srcs/constrs_1/constraints/ku060_pins.xdc`（引脚取自官方 KU_IO.xdc：clk_p=AK17 差分、reset=AC34 低有效、uart=AE33/AF34，端口名已适配 wrapper；**2026-08-11 batch 验证已注册进 constrs_1，重跑综合 0 错误**；注释为纯英文 ASCII，中文在 Vivado 编辑器会 GBK 乱码）
-- ✅ **git 已建立并推送**（2026-08-12）：`D:\FPGA` 重新 git init（master 分支），首次提交 M1 成果 + 合并远端 `chemmy-11/FPGA_Project`（私有）既有历史 → 推送成功（HEAD=e7ed594）。**`scripts/` Tcl 三件套从远端历史找回**（create_project/bd_mb_minimal/build/env_check.tcl，原以为丢失）。注意：git 全局代理 127.0.0.1:7897（Clash 类工具），代理未开时用 `git -c http.proxy= -c https.proxy=` 直连推送；凭据走系统 GCM
-- ⚠️ `vivado_project/`（Tcl 骨架三件套）已移除且本地无历史，**但远端仓库保留**（scripts/ 已并入本仓库）——不再丢失
-- ⛔ **原阻塞已突破（2026-08-11 晚）**：最小设计（led.v：按键取反→LED，无时钟无 IP）经 Vivado Hardware Manager Program **成功**（`xcku060 is programmed`）→ **JTAG 配置链路本身是好的**。MODE=001 理论**排除**（UG570 明文：JTAG 配置与 MODE 引脚选择无关；GPT 建议.md 亦确认）。根因方向 = **JTAG 链路/Vitis 调用路径**（偶发失败 + FT_Write=0 + 此前 Vitis Program 必败而 HW Manager 成功）。下一步：确认频率因素 → HW Manager 烧 project_1 bitstream → Vitis 取消 Program FPGA 勾选直接下载程序（MDM 路径）→ M1
-- 📄 参考：`docs/参考_cross_JTAG启动失败诊断_GPT建议_2026-08-11.md`（外部 AI 诊断，原根目录 GPT建议.md；含 UG570/UG908/UG912 引用与实验设计）
-- ✅ **part 修正已验证**（2026-08-11 晚）：改 part 为 `xcku060-ffva1156-2-i`（非 CIV）重跑综合/实现/bitstream → **HW Manager 烧录成功**（`End of startup status: HIGH`）→ 原 CIV 假设彻底作废（源头：学长教学视频，非本板实物）
-- ⏳ 待办（下一步）：
-  1. M2 第一步：打开 design_1 的 Address Editor 与 AXI Interconnect，对照讲解 AXI 协议基础（详见"阶段二已启动"条）
-  2. ✅ **FMC_4SFP 待查项①（2026-08-27 闭环）**：SFP_CLK = 156.25MHz 已确认（用户/黄工确认 + IBERT 上板 PLL Locked 实证）；时钟球对 = MGTREFCLK1_226（T6/T5）实测定案
-  3. ✅ **FMC_4SFP 待查项②（2026-08-27 闭环）**：控制信号引脚定版 = 版本 A（工作表1），12 脚经指南 XDC/引脚表/实现落位报告三方核验一致；XDC 已进 IBERT 例程工程
-  4. ⏭️ 8b/10b 环回实验（第 57 章）：实操单见 vault `操作文档/阶段二前置之二_8b10b环回实操单.md`
-  5. 可选：`write_bd_tcl` 把 design_1.bd 固化成脚本（防工程丢失；Tcl 三件套已从远端找回，可参照改造）
-- 🎯 里程碑 M1：Vitis 导入硬件平台，**Hello World 串口打印**
-- 📚 参考（vault 内，用户转述）：`操作文档/阶段一_Vitis环境与MicroBlaze软核.md`（手把手教程）、`长期路线图_2026-09-04.md`（**整盘棋基准：原 5 阶段计划与实际执行的对账，含四处分歧决策记录**）、`8.3/2026-04-30/FPGA-SFP-communication-with-Aurora 项目详细介绍.md`（基线全貌）
-
-## 文档规范（docs/ · 2026-09-19 定）
-
-仓库文档统一放 `docs/`，命名格式：**`[阶段]_prj标识_概要_YYYY-MM-DD.md`**（下划线连接、禁空格）。
-
-- **阶段**（所处阶段）：`阶段一` / `阶段二前置` / `阶段二之三`…`阶段二之八` / `阶段三`（沿用任务分工与路线图口径）；`前置`（无阶段归属的认知准备）/ `参考`（无阶段归属的技术参考）/ `里程碑`（里程碑总结）
-- **prj标识**：`prj1`…`prj9` = `project_N`；`ibert` / `aurora-ex` = 非 prj 编号的例程工程（ibert_ultrascale_gth_0 / aurora_64b66b_loop_ex）；`cross` = 跨工程通用
-- **概要**：≤15 字短词（中文或英文）
-- **日期**：定稿日期 `YYYY-MM-DD`（取 frontmatter `created`；原文件名已含日期的沿用）
-- 豁免：目录级索引 `README.md`、非 Markdown 数据文件（`KU引脚表.xlsx`）
-- 知识库 `操作文档` 快照入 `docs/操作文档/` 时**须脱敏**（本机用户名路径 `C:\Users\15266\` → `C:\Users\***\`；第三方人名 → `前辈`）；vault 为权威版本，快照是只读副本，随阶段推进定期刷新
-- 新旧文件名映射与完整索引：`docs/README.md`
-
-## 工程结构
+板级参数与设计的可信度排序，**只允许从高向低采信**：
 
 ```
-D:\FPGA\
-├── project_1/             # Vivado 2023.1 GUI 工程（2026-08-11 建，当前事实源）
-│   ├── project_1.xpr
-│   ├── project_1.srcs/    # sources_1（BD design_1）+ constrs_1/constraints/ku060_pins.xdc
-│   ├── project_1.runs/    # synth_1（完成）/ impl_1（待跑）
-│   └── project_1.gen/     # 生成物（wrapper、IP 网表）
-├── KU_IO.xdc              # 官方板卡 IO 引脚表（GBK 编码；时钟 100MHz 差分 AK17、复位 AC34、UART AE33/AF34）
-├── docs/                  # 文档中心：操作文档脱敏快照 + 交接/参考/里程碑文档（命名规范见「文档规范」）
-└── test/                  # 旧测试工程（2026-08-07，已废弃）
+官方例程/官方 XDC（正点原子 KU060例程 39/50/53/55 号等）
+  > 已上板验证过的 prj（prj6 网口栈 / prj8 数据级桥 M2 判据全过版）
+    > 板卡手册/引脚表（KU_IO.xdc，GBK 编码）
+      > AI 生成的开发文档（仅参考，不可作为实现依据）
 ```
 
-- `vivado_project/`、`vitis_project/` 已移除（2026-08-11 前）；Vitis 阶段工作区届时 GUI 新建即可
+推论：
+- 任何引脚/时序/IP 参数**先查官方例程 XDC 与已验证 prj 的 XDC**，找不到再问用户，最后才看 AI 文档。
+- **官方 RTL 文件保持原样**（磁盘上的官方栈/Aurora 例程文件永不改）。修复手法二选一：
+  ① **同名模块顶替**：新写 `xxx_fix.v`（module 名与官方一致），把官方文件从 fileset 移除、fix 加入（官方文件留在盘上）——prj8 `rgmii_rx_fix2.v` 即此法；
+  ② **派生新文件**：复制官方文件→改模块名→只在派生版上动刀（`aurora_64b66b_0_support_ext.v` 即此法）。
+- 判别实验优先：**怀疑实现层时先烧官方位流对照**（prj8 用官方 39 位流 ping 6/6 一举排除硬件，定位到实现层）。
 
-## 常用命令（Windows）
+## 三、硬件事实卡（实测定论，勿凭记忆改写）
 
-```bash
-"D:\Xilinx\Vivado\2023.1\bin\vivado.bat" D:\FPGA\project_1\project_1.xpr   # 打开工程（GUI）
-"D:\Xilinx\Vitis\2023.1\bin\vitis.bat"                                     # Vitis（工作区 GUI 新建）
+| 项 | 事实 | 证据来源 |
+|---|---|---|
+| 器件 | `xcku060-ffva1156-2-i`（非 CIV）| 丝印+实现通过 |
+| 系统时钟 | 100MHz 差分 AK17/AK16 | KU_IO.xdc |
+| 复位 | AC34 低有效 LVCMOS18 | KU_IO.xdc |
+| 网口 | GE1 RGMII（YT8531），栈时钟 eth_rxc 125M | 官方 39 XDC |
+| ⚠️ RGMII RX | 2023.1 吸收官方 BUFIO→IDDRE1 挂全局钟，须 `rgmii_rx_fix2.v`（IDELAY **1250ps**+IDELAYCTRL） | prj8 网表解剖+延迟扫描 |
+| Aurora 参考钟 | MGTREFCLK1_226（T6/T5）156.25MHz | IBERT 实测 |
+| 光口映射 | **A=Y11=X1Y11 · B=Y9=X1Y9 · C=Y10=X1Y10 · D=Y8=X1Y8**（Quad X1Y2） | 官方 55 号 XDC 注释 + GT LOC 双证 |
+| 光口控制脚 | A: tx_dis=AF12 rs0=AF13 rs1=AE13；B: AH12/AH11/AG11；C: J25/M26/M25；D: H26/G27/H27 | 官方 55 号 XDC |
+| 光模块 | 须 10G SFP+（线速率 10G，RS0=RS1=1 高速档，tx_disable=0） | Aurora xci C_LINE_RATE=10 |
+| LED | T22=观测（粘滞 rx）· T23=channel_up/link_ok（链路硬门控指示） | 各工程 XDC |
+| JTAG | 调试烧录用 Digilent USB-JTAG（210512180081）；串口 FT2232H-B COM7 | hw_server 实测 |
+| PC 侧 | NIC 192.168.1.102/24 静态 ↔ 板 192.168.1.10（MAC 00:11:22:33:44:55） | prj6 起 |
+| Python | `C:\Users\15266\AppData\Local\Python\pythoncore-3.14-64\python.exe`，**须 `PYTHONUTF8=1`**（GBK 控制台打 ✓ 会崩） | udp_verify 实证 |
+
+## 四、工程结构与脚本规范
+
+```
+D:\FPGA\project_N\
+├── rtl/            # 设计 RTL（官方栈按子目录分 arp/ icmp/ udp/ gmii_to_rgmii/）
+├── shared_logic/   # Aurora 例程共享逻辑（派生文件也放这，命名 *_ext/_shared）
+├── ip/             # 只存 .xci（import_ip + generate_target 重新生成，产物不入 git）
+├── xdc/            # 引脚+时钟组约束（引脚注释必须写来源）
+├── scripts/        # Tcl 四件套 + py（见下）
+├── out/            # 位流（gitignore）
+└── docs/           # 工程级文档（设计说明/PROGRESS）
 ```
 
-## 同步约定
+**脚本四件套（幂等，逐个可重跑）**：
+1. `create_project.tcl`——建工程：`add_files` glob → `import_ip`（勿用 read_ip，prj7 实测路径漂移）→ `generate_target all`。
+2. `build_debug.tcl`——综合+ILA 插入+实现+出流：输出 `TIMING:`（WNS）与 `DBG_BUILD_DONE:` 标记行供日志抓取。
+3. `program_board.tcl`——hw_server 烧录（成功标记 `PROGRAM_OK`）。
+4. `board_test_*.ps1`——一键「烧录→ping→udp_verify」判据跑。
 
-- 本文件 = 工程侧**唯一**执行版；vault `Agent 协作/AI协作中枢.md` = 中控维护的**状态视图**（可能滞后，以你实测为准）
-- 协作契约 = vault `Agent 协作/开发协作文档.md`（四方模型、事实源、柔性边界；变更由用户转达）
-- **工程内不维护 vault 文档副本**（`docs/` 已于 2026-08 移除）：需要什么信息直接更新本文件，参考文档一律回 vault 查（`毕设\` 下：短期待办、操作文档、8.3 会议纪要等），由用户转达或中控同步要点
-- **工程状态变化** → 你更新本文件"当前任务"节，并向用户报告一句"状态已更新"；**中枢同步由协调中控（桌面端 Reasonix）负责，你无需跨目录操作**
-- **中枢/规划变更** → 协调中控会同步到本文件，新会话自动加载
-- 两边不一致时，向用户确认后以中枢为准
+**规范**：日志落文件再 Select-String（勿管道直取——回显行会污染）；`create_project -force` 前先杀残留 vivado 进程（锁 runs 目录是实坑）；python 一律 `PYTHONUTF8=1`。
+
+## 五、RTL/设计规范
+
+1. **CDC 只有三种合法形式**：帧泵式格雷指针异步 FIFO、2FF 同步器（打拍≥2）、4 相握手邮箱。新跨域路径必须三选一。
+2. **mark_debug 探针标注时钟域**，ILAs 挂同名域——跨域采样探针曾是 WNS=-2.6ns 的元凶（prj8 首轮实证）。
+   B 通道（user_clk_b 域）探针绝不能挂 A 域（user_clk）ILA。
+3. **互不相关时钟必须声明时钟组**：`set_clock_groups -asynchronous`（eth_rxc / gt_refclk 派生 / init_clk 三组），否则跨域路径被假同步分析重罚。
+4. **XDC 只用受限 Tcl**：不能 `if/foreach/puts`（实测整段丢弃，CRITICAL WARNING [Designutils 20-1307]）。参数化约束改在 Tcl 脚本里生成。
+5. **判据无旁路原则**：数据通路必须被链路状态硬门控（`aurora_rst=~sys_rst_n|~channel_up`）——链路没起来板子对外静默，判据通过 ⇔ 数据真的穿过了链路。
+6. **一个 quad 只允许一个 GT_COMMON**：多 Aurora 同 quad 时，第一个实例的 support 引出 refclk+QPLL 四件套（`_ext`），兄弟实例用无 common 的 `_shared` 版；各实例私有 MMCM 时钟模块与复位逻辑。
+7. **Aurora 核端口方向**：`gt_pll_lock` 是核的**状态输出口**（外部 assign 驱动它 = MDRV-1）；外部锁定状态只走 `gt_qplllock_quad1_in`。
+8. IP 参数不确定时**只设置有把握的**——set_property 遇到不存在的参数名是致命错（fifo_generator 实坑）。
+
+## 六、调试方法论（按代价升序）
+
+1. **判别实验**：换已知好的位流（官方例程）对照，先分「硬件 vs 实现」。
+2. **ILA 单会话三段式**：同一 Vivado batch 会话内 arm → 起流量（ping）→ upload → CSV。arming 易失，**不能跨会话**。触发探针名要与 probes.ltx 一致；`TRIGGER_POSITION` 属性不被接受（省略或 catch）。
+3. **网表解剖**：`open_checkpoint` 两份 dcp 对比元件/位置/绑定（prj8 定位 BUFIO 被吸收即此法）。
+4. **延迟扫描**：时序边缘问题时改一个参数出一流（IDELAY 500→1250ps 即收敛过程），每次记录 ping 通过率。
+5. 每轮调试落**调试记录**（现象→假设→实验→证据→结论五要素），入 vault `操作文档/调试记录_*.md`。
+
+## 七、验证判据规范
+
+**三层证明力**（每层通过才算闭环）：
+| 层 | 命令 | 通过标准 | 证明 |
+|---|---|---|---|
+| 链路 | 看 T23 | 常亮 | channel_up（硬门控前提）|
+| 通路 | `ping 192.168.1.10 -n 20` | 0% 丢包 全 <1ms | ARP+ICMP 穿 Aurora 往返 |
+| 数据 | `$env:PYTHONUTF8=1; python scripts\udp_verify.py [次数]` | **回显一致 12/12** | payload 逐字节原样返回 |
+| 佐证 | Wireshark 抓 `udp.port==1234` | 请求/回显成对且 payload 相同 | 帧级眼见为实 |
+
+`udp_verify.py` 的 12 个长度（26~33/40/63/100/200）是刻意选的——**覆盖帧长%8 全部余数类**，专压打包/解包尾部处理。跑前关闭占用 1234 端口的程序。
+
+## 八、git 与文档规范
+
+- **每个里程碑一提交**，信息含：改了什么/为什么/WNS/判据结果。多行信息写临时文件 `git commit -F`，提交后删。
+- 提交语义前缀：`project_N:`（工程主线）/ `project_N fix:`（修根因）/ `docs:`（文档）。
+- vault 文档快照入 `docs/操作文档/` 须脱敏（用户名→`***`，人名→`前辈`）；命名 `[阶段]_prj标识_概要_YYYY-MM-DD`。
+- 工程状态变化 → 更新 README「当前推进」+ 向用户报告一句；中枢同步归中控。
+
+## 九、坑账本（踩过的坑 = 规范的来源）
+
+| # | 坑 | 根因与修法 |
+|---|---|---|
+| 1 | 中文路径 Tcl 报 File not found | GBK 码位问题；官方位流拷到 ASCII 路径再操作 |
+| 2 | XDC 里写 if/foreach 被整段丢弃 | XDC 是受限 Tcl；逻辑放 build 脚本 |
+| 3 | 帧尾总丢 1 字节（FCS 坏） | 帧泵 `rd_empty` 误用 `rd_bin_next` 提前判空——用当前 `rd_bin`（prj8 commit ae40965）|
+| 4 | 回显帧中段断裂 | unpack 对帧中断流敏感——改整帧存储转发（09-10）|
+| 5 | RX 字节「只 1→0」子集损伤 | 2023.1 吸收 BUFIO，IDDRE1 挂 BUFGCE 全局钟压位边界——FIXED IDELAY 1250ps×5 + IDELAYCTRL（065ee78/66ff43d）|
+| 6 | PLIDC-10 / REQP-1816 / 1817 | IDELAY 必须配 IDELAYCTRL，其 RST 不得接地也不得直连 LOCKED——用 clk200 打拍同步链 |
+| 7 | WNS=-2.6ns 假路径罚分 | 探针跨域采样 + 缺时钟组声明——mark_debug 标域 + set_clock_groups |
+| 8 | MDRV-1 QPLL1LOCK 多驱动 | Aurora 核 `gt_pll_lock` 是输出口，外部不可驱动（42f0ba2 踩坑实录）|
+| 9 | create_project -force 失败 | 残留 vivado 进程锁 runs 目录——先 Stop-Process vivado |
+| 10 | fifo_generator set_property 致命错 | 参数名臆造（Write_Depth_Flag 等）不存在——只设有把握的参数 |
+| 11 | hw_ila 属性拒绝 | TRIGGER_POSITION 不被接受——省略或 catch 包裹 |
+| 12 | python 打印 ✓ 崩溃 | GBK 控制台——`PYTHONUTF8=1` |
+| 13 | IBERT 与 Aurora 抢 GT | 同一 GT 通道不能二者并存——换装位流或用同 quad 空闲通道 |
+| 14 | 位流断电即失 | JTAG 烧录易失——每次上电重烧（board_test 一键脚本兜底）|
+
+## 十、当前工程状态（一屏速览，详表见 README.md）
+
+- ✅ prj6 网口栈（09-04）· ✅ prj8 数据级桥 M2 判据全过（09-18，git 66ff43d）
+- 🔄 **prj9 双笼真光链路**（git 42f0ba2，WNS=+1.008ns，位流就绪）：双 10G 模块插 **A(Y11)/B(Y9)** + LC 跳线直连 → T23（link_ok=双 channel_up）常亮 → 判据同 M2。T23 不亮先对调一端两纤。
+- ⏭️ 连通后：IBERT 眼图（空闲通道 C/D）→ 双板干线 → DDR/DMA 解冻
+- ⏸️ 挂起区：project_4 MIG · 串口桥三级验证 · project_7 内环 · 8b/10b 练手（恢复触发条件见 README）
+
+## 十一、同步约定（不变）
+
+- 本文件 = 工程侧唯一执行版；vault `Agent 协作/AI协作中枢.md` = 中控维护的状态视图（可能滞后，以实测为准）。
+- 工程状态变化 → 你更新本文件「当前工程状态」+ README，报告用户；跨目录同步归中控。
+- 两边不一致 → 向用户确认后以中枢为准。
+

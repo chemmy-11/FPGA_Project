@@ -4,6 +4,8 @@
 
 **架构定位（2026-09-04 定版）**：端点/上位机通信 = **标准以太网（千兆）**；Aurora 64b/66b = **板间干线**（单板阶段用于数据级验证，接入多块板组交换网络时作为板间 10G 互联）。
 
+> **给 Agent/协作者**：工程规范（事实源优先级、硬件事实卡、CDC/ILA/XDC 规范、调试方法论、坑账本）见 [`AGENTS.md`](AGENTS.md)。
+
 ## 里程碑
 
 - ✅ **M1（2026-08-11）**：Vitis 导入硬件平台，Hello World 串口打印成功（COM7@9600）
@@ -14,7 +16,7 @@
 - 🔄 **当前推进：真光链路（project_9）**——去内环（loopback 3'b000）+ 双笼 A↔B 版位流已产出（WNS=+1.008ns），待接线验证
 - ⏳ 后续：IBERT 眼图（空闲通道 C/Y10、D/Y8）→ 双板干线 → DDR/DMA 解冻 → 双模式转发 → 性能测量
 
-## 当前推进（2026-09-19）
+## 当前推进（2026-09-18）
 
 **project_9 · 真光链路版（Aurora 去 3'b010 内环）**
 - 单笼版（X1Y11）：首版位流 WNS=+0.936ns
@@ -64,7 +66,23 @@
 
 - part = **`xcku060-ffva1156-2-i`（非 CIV）**；100MHz 差分晶振（AK17/AK16）；复位 AC34（低有效）
 - 板载网口：双千兆 RGMII（GE1/GE2，YT8531 PHY）；FMC 四光口（GT Quad X1Y2，A=X1Y11，参考钟 T6/T5@156.25MHz）
-- JTAG：正点原子 FT2232H；串口 = FT2232H-B 通道（COM7，注册表 SERIALCOMM 实证）
+- JTAG：板载 FT2232H；本机调试烧录走 Digilent USB-JTAG（210512180081，hw_server 自动识别）；串口 = FT2232H-B 通道（COM7，注册表 SERIALCOMM 实证）
+
+## PC 侧验证三板斧（判据闭环）
+
+```powershell
+# 0) 断电重上电后位流易失 → 重烧（一键判据脚本）
+powershell -File D:\FPGA\project_9\scripts\board_test_*.ps1
+# 1) 链路：T23 常亮（channel_up / link_ok 硬门控）
+# 2) 通路：
+ping 192.168.1.10 -n 20          # 0% 丢包、全 <1ms
+# 3) 数据（⚠️ 先关占用 1234 端口的程序）：
+$env:PYTHONUTF8 = 1              # 必须！GBK 控制台打 ✓ 会崩
+cd D:\FPGA\project_9
+python scripts\udp_verify.py    # 回显一致 12/12（长度覆盖 帧长%8 全部余数类）
+```
+
+佐证：Wireshark 过滤 `udp.port==1234`，请求/回显成对且 payload 相同。三层证明力：T23=链路、ping=通路、udp_verify=数据完整性。
 
 ## 标准开发流程
 
