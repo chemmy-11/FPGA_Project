@@ -20,6 +20,111 @@ json_storm.py — 全量会话 JSON 打过 FPGA 光链路的传输质量测试�
 """
 import argparse, hashlib, json, socket, struct, sys, threading, time
 
+def _worker(args, wid, nproc, data, n, src_sha):
+    """每个进程: 独立端口 + 独立 seq 段, 返回 (wid, {seq: payload}, {stats})"""
+    import socket as sk
+    port = args.port + wid * 2
+    # 本进程负责的 seq 段(交错分配: seq % nproc == wid, 负载与丢失在时间上均匀)
+    mine = [i for i in range(n) if i % nproc == wid]
+    gap_s = args.gap_ms / 1000.0
+    s = sk.socket(sk.AF_INET, sk.SOCK_DGRAM)
+    s.bind(("0.0.0.0", port))
+    s.setsockopt(sk.SOL_SOCKET, sk.SO_RCVBUF, 4 * 1024 * 1024)
+    s.settimeout(0.002)
+    recv = {}; t_send = {}
+    import struct, time, threading
+    done = threading.Event()
+    def rx():
+        while not done.is_set():
+            try:
+                pkt, _ = s.recvfrom(65535)
+            except sk.timeout:
+                continue
+            except OSError:
+                break
+            if len(pkt) < 6:
+                continue
+            seq, ln = struct.unpack("<IH", pkt[:6])
+            if seq < n:
+                recv[seq] = pkt[6:]
+                if seq in t_send:
+                    rtts_w[seq] = time.perf_counter() - t_send[seq]
+    rtts_w = {}
+    th = threading.Thread(target=rx, daemon=True)
+    th.start()
+    for i in mine:
+        pkt = struct.pack("<IH", i, len(data[i*args.chunk:(i+1)*args.chunk] or b"")) + data[i*args.chunk:(i+1)*args.chunk]
+        t_send[i] = time.perf_counter()
+        s.sendto(pkt, ("192.168.1.10", port))
+        if gap_s:
+            time.sleep(gap_s)
+    t_done = time.perf_counter()
+    deadline = time.time() + 3.0
+    while time.time() < deadline and len(recv) < len(mine):
+        time.sleep(0.05)
+    done.set(); th.join(timeout=1)
+    return wid, dict(recv), {"t_done": t_done, "rtts": dict(rtts_w), "port": port}
+
+
+def run_parallel(data, args):
+    import hashlib, json, multiprocessing as mp, struct, time
+    total = len(data)
+    if args.limit_bytes:
+        data = data[: args.limit_bytes]
+        total = len(data)
+    src_sha = hashlib.sha256(data).hexdigest().upper()
+    n = (total + args.chunk - 1) // args.chunk
+    nproc = args.parallel
+    print(f"负载: {total} B -> {n} 片 x {args.chunk} B, 并行 {nproc} 进程, gap={args.gap_ms}ms")
+    print(f"源 SHA256: {src_sha}")
+    t0 = time.perf_counter()
+    ctx = mp.get_context("spawn")
+    with ctx.Pool(nproc) as pool:
+        results = pool.starmap(_worker, [(args, w, nproc, data, n, src_sha) for w in range(nproc)])
+    dur_send = max(r[2]["t_done"] for r in results) - t0
+    dur_total = time.perf_counter() - t0
+    recv = {}
+    for wid, d, st in results:
+        recv.update(d)
+    md5s = {i: hashlib.md5(data[i*args.chunk:(i+1)*args.chunk]).hexdigest() for i in range(n)}
+    got = sorted(recv.keys())
+    lost = [i for i in range(n) if i not in recv]
+    bad = [i for i in got if hashlib.md5(recv[i]).hexdigest() != md5s[i]]
+    rtts = sorted(v for _, _, st in results for v in st["rtts"].values())
+    def pct(p):
+        return rtts[min(len(rtts)-1, int(len(rtts)*p))] * 1000 if rtts else -1
+    good_bytes = sum(len(recv[i]) for i in got if i not in bad)
+    gput_send = good_bytes / dur_send / 1e6 if dur_send > 0 else 0
+    ok_stream = all(i in recv for i in range(n)) and not bad
+    if ok_stream:
+        blob = b"".join(recv[i] for i in range(n))
+        out_sha = hashlib.sha256(blob).hexdigest().upper()
+        match = out_sha == src_sha
+        if args.out:
+            open(args.out, "wb").write(blob)
+    else:
+        out_sha, match = "(有丢失/损坏, 未重组)", False
+    print()
+    print("==== 传输质量报告(并行) ====")
+    print(f"发送片数        : {n}  (进程端口: {[st['port'] for _,_,st in results]})")
+    print(f"收到片数        : {len(got)}  ({len(got)*100.0/n:.2f}%)")
+    print(f"丢失片数        : {len(lost)}  {('首丢:' + str(lost[:5])) if lost else ''}")
+    print(f"损坏片数(MD5不符): {len(bad)}")
+    if rtts:
+        print(f"RTT ms  min/avg/p95/max : {rtts[0]*1000:.2f} / {sum(rtts)/len(rtts)*1000:.2f} / {pct(0.95):.2f} / {rtts[-1]*1000:.2f}")
+    print(f"发送用时        : {dur_send:.2f}s")
+    print(f"发送阶段速率    : {gput_send:.2f} MB/s ({gput_send*8:.1f} Mbps)  [{nproc} 进程聚合]")
+    print(f"等效信道速率    : {gput_send*2:.2f} MB/s ({gput_send*16:.1f} Mbps)  [数据渡链路两次]")
+    print(f"重组 SHA256     : {out_sha}")
+    print(f"SHA256 比对     : {'一致 ✓ 全量数据完好穿越光链路往返' if match else '不一致 ✗'}")
+    summary = {"file_bytes": total, "chunks": n, "parallel": nproc, "recv": len(got),
+               "lost": len(lost), "corrupt": len(bad),
+               "rtt_avg_ms": (sum(rtts)/len(rtts)*1000) if rtts else -1,
+               "goodput_send_mbps": gput_send*8, "sha_match": match}
+    print("JSON_STORM_SUMMARY: " + json.dumps(summary, ensure_ascii=False))
+    return 0 if (len(lost) == 0 and len(bad) == 0 and match) else 1
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("file")
@@ -28,9 +133,12 @@ def main():
     ap.add_argument("--port", type=int, default=1234)
     ap.add_argument("--limit-bytes", type=int, default=0, help="只发前 N 字节(校准用)")
     ap.add_argument("--out", default="")
+    ap.add_argument("--parallel", type=int, default=1, help="并行进程数(各持独立端口, 真并行绕开 GIL)")
     args = ap.parse_args()
 
     data = open(args.file, "rb").read()
+    if args.parallel > 1:
+        return run_parallel(data, args)
     if args.limit_bytes:
         data = data[: args.limit_bytes]
     total = len(data)
@@ -134,7 +242,9 @@ def main():
     if rtt_vals:
         print(f"RTT ms  min/avg/p95/max : {rtt_vals[0]*1000:.2f} / {sum(rtt_vals)/len(rtt_vals)*1000:.2f} / {pct(0.95):.2f} / {rtt_vals[-1]*1000:.2f}")
     print(f"发送用时        : {dur_send:.2f}s   全程(含收尾): {dur_total:.2f}s")
+    gput_send = good_bytes / dur_send / 1e6 if dur_send > 0 else 0
     print(f"单向有效吞吐    : {gput:.2f} MB/s ({gput*8:.1f} Mbps)")
+    print(f"发送阶段速率    : {gput_send:.2f} MB/s ({gput_send*8:.1f} Mbps)  [扣除收尾等待]")
     print(f"等效信道速率    : {chan:.2f} MB/s ({chan*8:.1f} Mbps)  [数据渡链路两次]")
     print(f"重组 SHA256     : {out_sha}")
     print(f"SHA256 比对     : {'一致 ✓ 全量数据完好穿越光链路往返' if match else '不一致 ✗'}")
@@ -144,7 +254,7 @@ def main():
         "gap_ms": args.gap_ms, "recv": len(got), "lost": len(lost),
         "corrupt": len(corrupt), "inversions": inversions,
         "rtt_avg_ms": (sum(rtt_vals)/len(rtt_vals)*1000) if rtt_vals else -1,
-        "goodput_mbps": gput*8, "channel_mbps": chan*8, "sha_match": match,
+        "goodput_mbps": gput*8, "goodput_send_mbps": gput_send*8, "channel_mbps": chan*8, "sha_match": match,
     }
     print("JSON_STORM_SUMMARY: " + json.dumps(summary, ensure_ascii=False))
     return 0 if (len(lost) == 0 and len(corrupt) == 0 and match) else 1
