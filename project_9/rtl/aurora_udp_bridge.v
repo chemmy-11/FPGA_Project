@@ -135,9 +135,9 @@ wire user_clk_b, sync_clk_b;
 wire channel_up_b, lane_up_b, hard_err_b, soft_err_b, gt_pll_lock_b;
 wire [63:0] b_rx_tdata; wire [7:0] b_rx_tkeep; wire b_rx_tlast, b_rx_tvalid;
 wire [63:0] b_tx_tdata; wire [7:0] b_tx_tkeep; wire b_tx_tlast, b_tx_tvalid, b_tx_tready;
-wire [79:0] echo_din, echo_dout;
-wire echo_full, echo_empty, echo_wr, echo_rd;
-wire [15:0] echo_drop_cnt;
+wire [7:0]  echo_byte;                 // prj9 修复: B 回显改整帧存储转发(unpack→pack)
+wire        echo_byte_en;
+wire [15:0] echo_b_rx_frames, echo_b_tx_frames, echo_b_ovf;
 wire link_ok = channel_up & channel_up_b;   // 双通道都 up 才算真链路建立
 
 // 数据通路复位（user_clk 域）：系统复位 或 链路未建立
@@ -269,21 +269,38 @@ aurora_64b66b_0_support_ext u_aurora (   // prj9: _ext 版引出 refclk/QPLL 供
 //   A 侧数据通路（泵/打包/解包）零改动，全部仍在 A 的 user_clk 域。
 //   B 的 TX 无应用数据时 Aurora 自动发 idle —— 维持 A 的 channel_up。
 //*******************************************************************
-assign echo_din      = {7'b0, b_rx_tlast, b_rx_tkeep, b_rx_tdata};
-assign echo_wr       = b_rx_tvalid & ~echo_full;
-assign b_tx_tdata    = echo_dout[63:0];
-assign b_tx_tkeep    = echo_dout[71:64];
-assign b_tx_tlast    = echo_dout[72];
-assign b_tx_tvalid   = ~echo_empty;
-assign echo_rd       = b_tx_tvalid & b_tx_tready;
+// 根因修复(2026-09-20): 裸 FWFT FIFO 直通会在 B.RX 帧中间隙时把 B.TX 抽干
+// → Aurora TX 帧中欠载 → 64b/66b 帧协议违例 → TX 楔死(实测: ping 20/20 后 UDP
+//   连发 2 帧即全路径永久楔死)。改用 unpack→pack 级联: pack 整帧缓存后连续拍出,
+//   保证 B.TX 每帧无间隙 —— 与 prj8 第一根因(A 侧)同解, 模块复用零新逻辑。
+axis_word_unpack u_unpack_b (
+    .clk         (user_clk_b      ),
+    .rst         (aurora_rst      ),
+    .s_tdata     (b_rx_tdata      ),
+    .s_tkeep     (b_rx_tkeep      ),
+    .s_tlast     (b_rx_tlast      ),
+    .s_tvalid    (b_rx_tvalid     ),
+    .out_data    (echo_byte       ),
+    .out_valid   (echo_byte_en    ),
+    .o_byte_cnt  (                ),
+    .o_frame_cnt (echo_b_rx_frames),
+    .o_overflow  (                ),
+    .o_stall_cnt (                )
+);
 
-// 回显丢包计数（FIFO 满才丢 —— 匹配速率下物理上不应发生，供 ILA 观测）
-reg [15:0] echo_drop_r;
-always @(posedge user_clk_b) begin
-    if (aurora_rst)                    echo_drop_r <= 16'd0;
-    else if (b_rx_tvalid & echo_full)  echo_drop_r <= echo_drop_r + 16'd1;
-end
-assign echo_drop_cnt = echo_drop_r;
+axis_word_pack u_pack_b (
+    .clk         (user_clk_b       ),
+    .rst         (aurora_rst       ),
+    .in_data     (echo_byte        ),
+    .in_valid    (echo_byte_en     ),
+    .m_tdata     (b_tx_tdata       ),
+    .m_tkeep     (b_tx_tkeep       ),
+    .m_tlast     (b_tx_tlast       ),
+    .m_tvalid    (b_tx_tvalid      ),
+    .m_tready    (b_tx_tready      ),
+    .o_frame_cnt (echo_b_tx_frames ),
+    .o_overflow  (echo_b_ovf       )
+);
 
 aurora_64b66b_1_support_shared u_aurora_b (
     .s_axi_tx_tdata  (b_tx_tdata ),
@@ -316,17 +333,6 @@ aurora_64b66b_1_support_shared u_aurora_b (
     .gt_to_common_qpllreset_out (b_qpllreset)
 );
 
-// 回显弹性 FIFO：FWFT 同步 FIFO 512x80b（fifo_generator）
-fifo_80b_echo u_echo_fifo (
-    .clk   (user_clk_b ),
-    .srst  (aurora_rst ),
-    .din   (echo_din   ),
-    .wr_en (echo_wr    ),
-    .full  (echo_full  ),
-    .dout  (echo_dout  ),
-    .rd_en (echo_rd    ),
-    .empty (echo_empty )
-);
 
 //*******************************************************************
 // GMII <-> RGMII（官方原版；2026-09-10 回退"改动 D"）
@@ -478,7 +484,7 @@ eth_ctrl u_eth_ctrl (
 //*******************************************************************
 frame_fifo_pump u_pump_fwd (
     .wr_clk       (gmii_rx_clk   ),
-    .wr_rst_n     (sys_rst_n     ),
+    .wr_rst_n     (~aurora_rst   ),   // C22: 与读侧对称, 否则链路抖动只复位读侧 -> 指针失配
     .wr_data      (stack_txd     ),
     .wr_en        (stack_tx_en   ),
     .rd_clk       (user_clk      ),
@@ -534,7 +540,7 @@ frame_fifo_pump u_pump_rev (
     .wr_data      (unpack_data   ),
     .wr_en        (unpack_en     ),
     .rd_clk       (gmii_rx_clk   ),
-    .rd_rst_n     (sys_rst_n     ),
+    .rd_rst_n     (~aurora_rst   ),   // C22: 与写侧对称
     .rd_data      (pump_rev_data ),
     .rd_en        (pump_rev_en   ),
     .wr_frame_cnt (pump_rev_wr   ),
@@ -614,6 +620,7 @@ assign led_link = link_ok;   // prj9: 双通道都 up 才点亮
 (* mark_debug = "true" *) wire        dbg_ch_up_b     = channel_up_b;
 (* mark_debug = "true" *) wire        dbg_b_rx_tvalid = b_rx_tvalid;
 (* mark_debug = "true" *) wire        dbg_b_tx_tvalid = b_tx_tvalid;
-(* mark_debug = "true" *) wire [15:0] dbg_echo_drop   = echo_drop_cnt;
+(* mark_debug = "true" *) wire [15:0] dbg_echo_b_tx   = echo_b_tx_frames;
+(* mark_debug = "true" *) wire [15:0] dbg_echo_b_ovf  = echo_b_ovf;
 
 endmodule

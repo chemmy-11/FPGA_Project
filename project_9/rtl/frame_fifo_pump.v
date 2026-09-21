@@ -40,6 +40,7 @@ reg  [AW:0] rd_ptr_g_s1, rd_ptr_g_s2;   // rd gray synced into wr domain
 reg  [AW:0] wr_ptr_g_s1, wr_ptr_g_s2;   // wr gray synced into rd domain
 
 reg             hs_busy;                // frame in flight (handshake pending)
+reg             frm_dropping;           // C22: 当前帧按"忙时丢弃"处理(整帧不进 RAM)
 reg             wr_dv_d;                // wr_en delayed (frame-end detect)
 reg [15:0]      wr_cnt;                 // bytes written in current frame
 reg [15:0]      frame_len_mb;           // mailbox: latched frame length
@@ -73,9 +74,16 @@ endfunction
 // write side: pointers (advance ONLY on actual writes) + frame gather
 //=============================================================================
 assign wr_bin_next = wr_bin + 1'b1;
-assign wr_full = (wr_bin_next[AW] != rd_ptr_g_s2[AW]) &&
-                 (wr_bin_next[AW-1] != rd_ptr_g_s2[AW-1]);
-assign wr_valid = wr_en && !wr_full;
+// C22 根因修复(2026-09-20): 原式把**二进制** wr_bin_next 与**格雷码** rd_ptr_g_s2
+// 逐位混比, 在指针回绕(累计字节跨 2048)后永久伪满 → 写侧拒收一切帧
+// (板上: 25 帧后 ping/UDP 全灭; 仿真: 40 帧只完成 24, 16 帧无声消失)。
+// 改为标准 Cummings 格雷满判: 写指针下一拍的格雷码 == 读指针格雷码高两位取反。
+wire [AW:0] wr_ptr_g_nxt = bin2gray(wr_bin_next);
+assign wr_full = (wr_ptr_g_nxt == {~rd_ptr_g_s2[AW:AW-1], rd_ptr_g_s2[AW-2:0]});
+// C22: 忙时的帧整帧不进 RAM(帧原子性) —— 否则丢弃帧的字节仍会推走写指针,
+// 与读侧"恰好读 rd_len 字节"失配, 指针永久错位。frm_dropping 保证释放若发生在
+// 某丢弃帧中间, 该帧仍完整丢弃而非半截进 RAM。
+assign wr_valid = wr_en && !wr_full && !hs_busy && !frm_dropping;
 assign wr_en_fall = ~wr_en & wr_dv_d;
 
 always @(posedge wr_clk or negedge wr_rst_n) begin
@@ -101,7 +109,7 @@ end
 // frame gather + 4-phase handshake（含释放逻辑，单块单驱动——C18 根治）
 always @(posedge wr_clk or negedge wr_rst_n) begin
     if(!wr_rst_n) begin
-        hs_busy <= 1'b0; wr_dv_d <= 1'b0; wr_cnt <= 16'd0;
+        hs_busy <= 1'b0; frm_dropping <= 1'b0; wr_dv_d <= 1'b0; wr_cnt <= 16'd0;
         frame_len_mb <= 16'd0; wr_done_t <= 1'b0;
         wr_frame_cnt <= 16'd0; wr_drop_cnt <= 16'd0;
         rd_done_t_s1 <= 1'b0; rd_done_t_s2 <= 1'b0; rd_done_t_ack <= 1'b0;
@@ -117,7 +125,7 @@ always @(posedge wr_clk or negedge wr_rst_n) begin
         // wr_drop_cnt 成了死计数器("drop=0" 不能证明没丢帧)。
         if(wr_valid)
             wr_cnt <= wr_cnt + 16'd1;
-        if(!hs_busy) begin
+        if(!hs_busy && !frm_dropping) begin
             if(wr_en_fall && wr_cnt != 16'd0) begin
                 frame_len_mb <= wr_cnt;
                 wr_done_t    <= ~wr_done_t;     // frame available -> toggle
@@ -128,11 +136,21 @@ always @(posedge wr_clk or negedge wr_rst_n) begin
                 wr_cnt <= 16'd0;
         end
         else begin
-            // handshake pending: incoming frames dropped (counted)
-            if(wr_en_fall && wr_cnt != 16'd0) begin
-                wr_drop_cnt <= wr_drop_cnt + 16'd1;
-                wr_cnt <= 16'd0;
+            // handshake pending(或释放落在丢弃帧中间): 整帧丢弃, 计数用 wr_en
+            // (wr_valid 已被门控, 字节不进 RAM, 只计数供丢弃判定)
+            if(wr_en)
+                wr_cnt <= wr_cnt + 16'd1;
+            if(wr_en && !wr_dv_d)
+                frm_dropping <= 1'b1;
+            if(wr_en_fall) begin
+                if(wr_cnt != 16'd0)
+                    wr_drop_cnt <= wr_drop_cnt + 16'd1;
+                wr_cnt       <= 16'd0;
+                frm_dropping <= 1'b0;
             end
+            // C22b: 释放不得被 frm_dropping 门控——释放窗口只有一拍, 若恰逢丢弃帧
+            // 中途会被永久错过(仿真: 40 帧只完成 1)。半帧防护由 frm_dropping 单独
+            // 保证(它直到帧尾才清), hs_busy 无需参与。
             if(rd_done_t_s2 != rd_done_t_ack)
                 hs_busy <= 1'b0;                // frame fully drained -> release
         end
