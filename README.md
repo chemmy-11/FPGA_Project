@@ -13,7 +13,86 @@
 - ✅ **Aurora 64b/66b 链路层（2026-08-31）**：内部环回，channel_up/lane_up/误码全 0（ILA）
 - ✅ **以太网上位机通道（2026-09-04）**：UDP/ARP/ICMP 栈 + 抓包验证（ping / 回环 / 四包链）
 - ✅ **M2 数据级桥（2026-09-18）**：PC UDP 数据穿越 Aurora 64b/66b 编解码往返——ping 10/10+20/20 全 <1ms、udp_verify 12/12 + 压力 36/36 逐字节一致；三根因（unpack 断流 / 帧泵 rd_empty off-by-one / RGMII RX 采样相位）全部修复闭环
-- ✅ **真光链路（project_9，2026-09-20）**：双笼 A(Y11)↔B(Y9) 真光路（数据渡光两次）判据全过——ping 20/20 + udp 12/12 + 压力 36/36 + 复测无楔死
+- ✅ **真光链路（project_9，2026-09-20）**：双笼 A(Y11)↔B(Y9) 真光路（数据渡光两次）判据全过——ping 20/20 + udp 12/12 + 压力 36/36 + 复测无楔死；帧泵格雷满判根因修复（f7c8be8）
+- ✅ **会话 JSON 传输质量评测（2026-09-20 晚）**：质量档 100%+SHA 一致 / 性能档 99.84% @ 19.3 Mbps / 容量档测出系统串行上限 ~23 Mbps（工具 json_storm.py + storm_demo.ps1）
+- ⏳ 后续：帧泵 v2 多帧队列 → B 侧探针位流 → IBERT 眼图 → 双板干线 → DDR/DMA 解冻
 - ⏳ 后续：IBERT 眼图（空闲通道 C/Y10、D/Y8）→ 双板干线 → DDR/DMA 解冻 → 双模式转发 → 性能测量
 
 ## 当前推进（2026-09-20）
+
+- ✅ **prj9 真光链路判据全过（09-20，git f7c8be8）**：A(Y11)↔B(Y9) 双 10G 模块 + LC 跳线，数据渡光两次。T23 常亮 + ping 20/20 + udp 12/12 + 压力 36/36 + 复测无楔死，WNS=+1.006ns。
+- ✅ **会话 JSON 传输质量评测（09-20 晚）**：质量档 100KB 100%+SHA 一致；性能档 10MB 99.84% @ 19.3 Mbps（PC 单流天花板）；容量档测出系统串行上限 ~23 Mbps（store-and-forward 流水线瓶颈，帧泵 v2 的靶子）。损坏/乱序全程 0。
+- 🔍 帧泵 wr_full 二进制/格雷混比根因修复详见知识库《调试记录_prj9_帧泵格雷满判_2026-09-20》。
+- ⏭️ 下一步：帧泵 v2 多帧队列 → B 侧探针位流（Aurora 段 0.4% 底噪）→ 过载冻结根因 → IBERT 眼图 → 双板干线
+
+## 工程索引（状态一览）
+
+### ✅ 已完成
+
+| 目录 | 工程 | 达成 | 说明 |
+|---|---|---|---|
+| `project_1/` | MicroBlaze 最小系统 | ✅ M1（08-11） | BD design_1：MicroBlaze + UART Lite + AXI Interconnect |
+| `ibert_ultrascale_gth_0/` | IBERT 眼图实验 | ✅ 08-27 | 10G PRBS 跨口过纤 0E0；眼图截图已归档 |
+| `aurora_64b66b_loop_ex/` | Aurora 例程 + UART 桥 | ✅ 08-31 内环验证 | 10G duplex X1Y11；`uart_bridge.v`（串口桥位流在库，验证挂起见下） |
+| `project_6/` | 以太网 UDP 网口栈 | ✅ 09-04 上板验证 | 官方 39_eth_udp_loop 整包移植；ping/UDP 回环/Wireshark 四包链 |
+| `project_8/` | **Aurora-UDP 数据级桥** | ✅ **M2（09-18）判据全过** | 以太网栈 + Aurora 64b/66b（X1Y11 内环）；axis_word_pack/unpack 8↔64 打包 + 双向帧泵；`rtl/*_dly.v` = IDELAY 1250ps 修复版；三根因排障脚本与 ILA 捕获数据在 `scripts/`；`docs\设计说明_*.md` |
+
+### 🔄 正在推进
+
+| 目录 | 工程 | 状态 | 说明 |
+|---|---|---|---|
+| `project_9/` | **真光链路版（单笼/双笼 A↔B）** | 🔄 位流就绪，待接线验证 | project_8 全部验证资产复用（含 rgmii_rx_fix2 IDELAY 1250ps），loopback 3'b010→3'b000；双笼版架构见上文"当前推进" |
+
+### ⏸️ 挂起（位流在库，恢复即用）
+
+| 目录/课题 | 挂起时间 / 原因 | 恢复触发 |
+|---|---|---|
+| `project_4/` MIG/DDR4 验证 | 08-31（决策 #5，导师指示先做网口+SFP） | DDR 解冻 / 做缓存转发与 DMA 对接 |
+| `aurora_64b66b_loop_ex/` 串口桥 M-D 三级验证 | 09-04：链路健康但桥出复位 | 解 dbg 探针时钟域 undefined + AE33 输入方向 |
+| `project_7/` UDP+SFP 前端内环 | 09-04（决策 #10，架构定版后让位数据级桥） | 光电转/带 SFP 口交换机到位，或多端点形态复用 |
+| 8b/10b 裸调 GT 练手 | 08-27（决策 #2，物理层已由 IBERT 覆盖） | 需要裸层参照（Aurora 排障）或答辩补充 |
+
+### 🗄️ 归档 / 工具
+
+| 目录 | 说明 |
+|---|---|
+| `project_2/` | IBERT 主工程（结论已入 ibert 例程） |
+| `project_3/` | Aurora IP 主工程（64b/66b 定版 xci：10G duplex X1Y11） |
+| `0DMA_uart2ddr/` | 旧 DMA 实验（DDR 搁置期间预研） |
+| `scripts/` | Tcl 骨架三件套：create_project / bd_mb_minimal / build / env_check |
+| `KU_IO.xdc`（根） · `docs/KU引脚表.xlsx` | 官方板卡引脚表（GBK 编码；时钟 AK17 差分 / 复位 AC34） |
+| `docs/参考_cross_FMC_4SFP_GTH引脚表_2026-08-27.md` | FMC 四光口引脚速查（GT Quad X1Y2：A=X1Y11、B=X1Y9、C=X1Y10、D=X1Y8；控制脚版本 A） |
+| `docs/` | **文档中心**：操作文档脱敏快照（含挂起区）+ 交接/参考/里程碑文档；命名规范 `[阶段]_prj标识_概要_YYYY-MM-DD`（见 `docs/README.md` 与 `AGENTS.md`「文档规范」） |
+
+## 硬件基线（实测定论）
+
+- part = **`xcku060-ffva1156-2-i`（非 CIV）**；100MHz 差分晶振（AK17/AK16）；复位 AC34（低有效）
+- 板载网口：双千兆 RGMII（GE1/GE2，YT8531 PHY）；FMC 四光口（GT Quad X1Y2，A=X1Y11，参考钟 T6/T5@156.25MHz）
+- JTAG：板载 FT2232H；本机调试烧录走 Digilent USB-JTAG（210512180081，hw_server 自动识别）；串口 = FT2232H-B 通道（COM7，注册表 SERIALCOMM 实证）
+
+## PC 侧验证三板斧（判据闭环）
+
+```powershell
+# 0) 断电重上电后位流易失 → 重烧（一键判据脚本）
+powershell -File D:\FPGA\project_9\scripts\board_test_*.ps1
+# 1) 链路：T23 常亮（channel_up / link_ok 硬门控）
+# 2) 通路：
+ping 192.168.1.10 -n 20          # 0% 丢包、全 <1ms
+# 3) 数据（⚠️ 先关占用 1234 端口的程序）：
+$env:PYTHONUTF8 = 1              # 必须！GBK 控制台打 ✓ 会崩
+cd D:\FPGA\project_9
+python scripts\udp_verify.py    # 回显一致 12/12（长度覆盖 帧长%8 全部余数类）
+```
+
+佐证：Wireshark 过滤 `udp.port==1234`，请求/回显成对且 payload 相同。三层证明力：T23=链路、ping=通路、udp_verify=数据完整性。
+
+## 标准开发流程
+
+1. Vivado：设计 → 综合/实现 → Generate Bitstream → Export Hardware（含 bitstream）→ .xsa
+2. Hardware Manager：Program Device（成功标志 `End of startup status: HIGH`）
+3. Vitis：更新 .xsa → Run Configuration **取消 Program FPGA**（保留 Reset entire system）→ Run → 串口 9600
+4. 批处理构建：`vivado -mode batch -source <script>.tcl`（幂等脚本见各工程 `scripts\`；⚠️ 需在纯 ASCII 工作目录运行）
+
+---
+
+*状态以本文件 + git log 为准；里程碑判定与决策记录详见知识库《长期路线图 v4.1》。*
