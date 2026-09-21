@@ -22,7 +22,8 @@ module frame_fifo_pump(
     // status (for ILA / debug)
     output  reg [15:0]  wr_frame_cnt,
     output  reg [15:0]  wr_drop_cnt ,
-    output  reg [15:0]  rd_frame_cnt
+    output  reg [15:0]  rd_frame_cnt,
+    output              o_hs_busy       // prj9 判决(2026-09-21): 帧在途电平 —— 冻结看门狗用
 );
 
 //=============================================================================
@@ -40,6 +41,7 @@ reg  [AW:0] rd_ptr_g_s1, rd_ptr_g_s2;   // rd gray synced into wr domain
 reg  [AW:0] wr_ptr_g_s1, wr_ptr_g_s2;   // wr gray synced into rd domain
 
 reg             hs_busy;                // frame in flight (handshake pending)
+assign o_hs_busy = hs_busy;             // prj9: 引出给顶层看门狗
 reg             frm_dropping;           // C22: 当前帧按"忙时丢弃"处理(整帧不进 RAM)
 reg             wr_dv_d;                // wr_en delayed (frame-end detect)
 reg [15:0]      wr_cnt;                 // bytes written in current frame

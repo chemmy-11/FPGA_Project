@@ -19,6 +19,15 @@
 #     [173]    lane_up
 #     [174]    hard_err
 #     [175]    soft_err
+#     [191:176] pk_ovf_cnt    [207:192] pfwd_rd      [223:208] hard_err_cnt
+#     [239:224] soft_err_cnt  [255:240] ch_up_evt    [271:256] pfwd_stuck_cnt  [272] pfwd_stuck
+#
+# ILA2 @ Aurora B 通道 user_clk_b（~151.5 MHz）
+#   probe0 宽 101 (6x16 计数总线 + 5 单比特; 以 llength 自适应为准)
+#     [15:0]   echo_b_rx       [31:16]  echo_b_tx      [47:32] echo_b_ovf_cnt
+#     [63:48]  hard_err_b_cnt  [79:64]  soft_err_b_cnt [95:80] ch_up_b_evt
+#     [96]     ch_up_b         [97]     lane_up_b      [98]    echo_b_ovf
+#     [99]     b_rx_tvalid     [100]    b_tx_tvalid
 #
 # ILA1 @ eth_rxc / gmii_rx_clk（125 MHz, PHY）
 #   probe0 宽 33
@@ -40,6 +49,13 @@ wait_on_run synth_1
 puts "SYNTH_STATUS: [get_property STATUS [get_runs synth_1]]"
 if {[get_property PROGRESS [get_runs synth_1]] != "100%"} { error "synth failed" }
 open_run synth_1 -name synth_1
+
+# 单比特网严格解析: 找不到立即报错(2026-09-21: 替代 lindex[get_nets] 的静默空值)
+proc one_net {name} {
+    set n [get_nets -quiet [list $name]]
+    if {[llength $n] == 0} { error "net not found: $name" }
+    return [lindex $n 0]
+}
 
 proc bus_nets {name width} {
     set nets {}
@@ -87,7 +103,15 @@ lappend nets0 [lindex [get_nets [list dbg_ch_up   ]] 0]
 lappend nets0 [lindex [get_nets [list dbg_lane_up ]] 0]
 lappend nets0 [lindex [get_nets [list dbg_hard_err]] 0]
 lappend nets0 [lindex [get_nets [list dbg_soft_err]] 0]
-set_property port_width 176 [get_debug_ports u_ila_0/probe0]
+# ---- prj9 判决计数器（2026-09-21）----
+foreach n [bus_nets dbg_pk_ovf_cnt     16] { lappend nets0 $n }
+foreach n [bus_nets dbg_pfwd_rd        16] { lappend nets0 $n }
+foreach n [bus_nets dbg_hard_err_cnt   16] { lappend nets0 $n }
+foreach n [bus_nets dbg_soft_err_cnt   16] { lappend nets0 $n }
+foreach n [bus_nets dbg_ch_up_evt      16] { lappend nets0 $n }
+foreach n [bus_nets dbg_pfwd_stuck_cnt 16] { lappend nets0 $n }
+lappend nets0 [lindex [get_nets [list dbg_pfwd_stuck]] 0]
+set_property port_width 273 [get_debug_ports u_ila_0/probe0]
 connect_debug_port u_ila_0/probe0 $nets0
 
 # ============ ILA1 @ eth_rxc (gmii_rx_clk), probe0 宽 33 ============
@@ -125,6 +149,41 @@ foreach n [bus_nets dbg_rec_byte_num 16] { lappend nets1 $n }
 foreach n [bus_nets dbg_udp_src_port 16] { lappend nets1 $n }
 set_property port_width 78 [get_debug_ports u_ila_1/probe0]
 connect_debug_port u_ila_1/probe0 $nets1
+
+# ============ ILA2 @ user_clk_b (B 通道), probe0 宽 85 ============
+#   B 域信号严禁挂 ILA0(A 域)/ILA1(eth 域) —— 独立时钟域必须独立 ILA。
+create_debug_core u_ila_2 ila
+set_property C_DATA_DEPTH 1024 [get_debug_cores u_ila_2]
+set_property C_TRIGIN_EN false [get_debug_cores u_ila_2]
+set_property C_TRIGOUT_EN false [get_debug_cores u_ila_2]
+set_property C_INPUT_PIPE_STAGES 0 [get_debug_cores u_ila_2]
+set_property C_EN_STRG_QUAL false [get_debug_cores u_ila_2]
+set_property ALL_PROBE_SAME_MU true [get_debug_cores u_ila_2]
+set_property ALL_PROBE_SAME_MU_CNT 1 [get_debug_cores u_ila_2]
+set_property port_width 1 [get_debug_ports u_ila_2/clk]
+set bclk_net [get_nets -quiet [list user_clk_b]]
+if {[llength $bclk_net] == 0} {
+    set bclk_net [get_nets -quiet -of_objects [get_pins -quiet {u_pack_b/frame_active_reg/C}]]
+}
+if {[llength $bclk_net] == 0} { error "user_clk_b net not found (nor via u_pack_b/frame_active_reg/C)" }
+puts "ILA2_CLK_NET: $bclk_net"
+connect_debug_port u_ila_2/clk $bclk_net
+
+set nets2 {}
+foreach n [bus_nets dbg_echo_b_rx      16] { lappend nets2 $n }
+foreach n [bus_nets dbg_echo_b_tx      16] { lappend nets2 $n }
+foreach n [bus_nets dbg_echo_b_ovf_cnt 16] { lappend nets2 $n }
+foreach n [bus_nets dbg_hard_err_b_cnt 16] { lappend nets2 $n }
+foreach n [bus_nets dbg_soft_err_b_cnt 16] { lappend nets2 $n }
+foreach n [bus_nets dbg_ch_up_b_evt    16] { lappend nets2 $n }
+lappend nets2 [lindex [get_nets [list dbg_ch_up_b    ]] 0]
+lappend nets2 [lindex [get_nets [list dbg_lane_up_b  ]] 0]
+lappend nets2 [one_net dbg_echo_b_ovf]
+lappend nets2 [lindex [get_nets [list dbg_b_rx_tvalid]] 0]
+lappend nets2 [lindex [get_nets [list dbg_b_tx_tvalid]] 0]
+# 位宽按实际收集到的网数自适应(综合优化可能合并个别网, 硬编码会 12-700 拒连)
+set_property port_width [llength $nets2] [get_debug_ports u_ila_2/probe0]
+connect_debug_port u_ila_2/probe0 $nets2
 
 # implement_debug_core 要求先保存设计 → 检查点保存/重开（论坛标准解法）
 write_checkpoint -force $proj/scripts/pre_impl_debug.dcp

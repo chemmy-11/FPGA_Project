@@ -23,4 +23,12 @@ run_hw_ila $ila0
 after 2000
 set d0 [upload_hw_ila_data $ila0]
 write_hw_ila_data -force -csv_file $out/ila_cnt0.csv $d0
+# ---- ILA2 @ user_clk_b: B 通道判决计数器（2026-09-21）----
+set ila2 [lindex [get_hw_ilas -of_objects $dev] 2]
+set pr2 [get_hw_probes -of_objects $ila2 -filter {NAME =~ "*dbg_ch_up_b"}]
+set_property TRIGGER_COMPARE_VALUE {eq1'b1} $pr2
+run_hw_ila $ila2
+after 1500
+set d2 [upload_hw_ila_data $ila2]
+write_hw_ila_data -force -csv_file $out/ila_cnt2.csv $d2
 puts CNT_SNAP_DONE

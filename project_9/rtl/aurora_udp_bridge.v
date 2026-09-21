@@ -124,6 +124,7 @@ wire [7:0]    pump_fwd_data;  wire pump_fwd_en;      // 泵出（user_clk）
 wire [7:0]    unpack_data;    wire unpack_en;        // 解包出（user_clk）
 wire [7:0]    pump_rev_data;  wire pump_rev_en;      // 泵回（eth_rxc）
 wire [15:0]   pump_fwd_wr, pump_fwd_drop, pump_fwd_rd;
+wire          pump_fwd_hs_busy;              // prj9 判决: 泵A帧在途(读侧, user_clk)
 wire [15:0]   pump_rev_wr, pump_rev_drop, pump_rev_rd;
 wire [15:0]   pack_frames;    wire pack_ovf;
 wire [15:0]   unpack_bytes, unpack_frames; wire unpack_ovf; wire [15:0] unpack_stall;
@@ -493,7 +494,8 @@ frame_fifo_pump u_pump_fwd (
     .rd_en        (pump_fwd_en   ),
     .wr_frame_cnt (pump_fwd_wr   ),
     .wr_drop_cnt  (pump_fwd_drop ),
-    .rd_frame_cnt (pump_fwd_rd   )
+    .rd_frame_cnt (pump_fwd_rd   ),
+    .o_hs_busy    (pump_fwd_hs_busy)
 );
 
 //*******************************************************************
@@ -575,6 +577,57 @@ assign led_loop = led_loop_r;
 assign led_link = link_ok;   // prj9: 双通道都 up 才点亮
 
 //*******************************************************************
+// prj9 判决计数器（2026-09-21）: 0.4% 丢失定位 + 冻结看门狗
+//   一次全量运行后的差分链:
+//     pfwd_wr → pfwd_rd → pk_frames → [A.TX→纤→B.RX] → echo_b_rx
+//     → echo_b_tx → [B.TX→纤→A.RX] → up_frames → prev_wr
+//   差额落在哪一段, 丢失就在哪一段; echo_b_ovf_cnt>0 = pack_b 整帧字丢失实锤。
+//   冻结看门狗: 泵A 在途 >2M 拍(~13ms, 正常帧 ~21us) = 楔死, 记事件数。
+//*******************************************************************
+reg [15:0] hard_err_cnt, soft_err_cnt, ch_up_evt_cnt, pk_ovf_cnt;
+reg        ch_up_d;
+reg [21:0] pfwd_busy_cyc;
+reg        pfwd_stuck;
+reg [15:0] pfwd_stuck_cnt;
+reg [15:0] echo_b_ovf_cnt, hard_err_b_cnt, soft_err_b_cnt, ch_up_b_evt_cnt;
+reg        ch_up_b_d;
+always @(posedge user_clk) begin
+    if (aurora_rst) begin
+        hard_err_cnt <= 16'd0; soft_err_cnt <= 16'd0; ch_up_evt_cnt <= 16'd0;
+        pk_ovf_cnt <= 16'd0;  ch_up_d <= 1'b0;
+        pfwd_busy_cyc <= 22'd0; pfwd_stuck <= 1'b0; pfwd_stuck_cnt <= 16'd0;
+    end else begin
+        ch_up_d <= channel_up;
+        if (hard_err) hard_err_cnt <= hard_err_cnt + 16'd1;
+        if (soft_err) soft_err_cnt <= soft_err_cnt + 16'd1;
+        if (ch_up_d & ~channel_up) ch_up_evt_cnt <= ch_up_evt_cnt + 16'd1;
+        if (pack_ovf) pk_ovf_cnt <= pk_ovf_cnt + 16'd1;
+        if (!pump_fwd_hs_busy) begin
+            pfwd_busy_cyc <= 21'd0;
+            pfwd_stuck    <= 1'b0;
+        end else begin
+            pfwd_busy_cyc <= pfwd_busy_cyc + 22'd1;
+            if (pfwd_busy_cyc == 22'h200000) begin
+                pfwd_stuck     <= 1'b1;
+                pfwd_stuck_cnt <= pfwd_stuck_cnt + 16'd1;
+            end
+        end
+    end
+end
+always @(posedge user_clk_b) begin
+    if (aurora_rst) begin
+        echo_b_ovf_cnt <= 16'd0; hard_err_b_cnt <= 16'd0;
+        soft_err_b_cnt <= 16'd0; ch_up_b_evt_cnt <= 16'd0; ch_up_b_d <= 1'b0;
+    end else begin
+        ch_up_b_d <= channel_up_b;
+        if (echo_b_ovf) echo_b_ovf_cnt <= echo_b_ovf_cnt + 16'd1;
+        if (hard_err_b) hard_err_b_cnt <= hard_err_b_cnt + 16'd1;
+        if (soft_err_b) soft_err_b_cnt <= soft_err_b_cnt + 16'd1;
+        if (ch_up_b_d & ~channel_up_b) ch_up_b_evt_cnt <= ch_up_b_evt_cnt + 16'd1;
+    end
+end
+
+//*******************************************************************
 // ILA 探针（脚本化调试核插入）
 //*******************************************************************
 // user_clk 域
@@ -621,6 +674,22 @@ assign led_link = link_ok;   // prj9: 双通道都 up 才点亮
 (* mark_debug = "true" *) wire        dbg_b_rx_tvalid = b_rx_tvalid;
 (* mark_debug = "true" *) wire        dbg_b_tx_tvalid = b_tx_tvalid;
 (* mark_debug = "true" *) wire [15:0] dbg_echo_b_tx   = echo_b_tx_frames;
-(* mark_debug = "true" *) wire [15:0] dbg_echo_b_ovf  = echo_b_ovf;
+(* mark_debug = "true" *) wire        dbg_echo_b_ovf  = echo_b_ovf;   // 1位脉冲(2026-09-21 修正: 原误声明16位, 综合拆网致 get_nets 落空)
+
+// ---- prj9 判决计数器（2026-09-21）: A 域(user_clk) 挂 ILA0; B 域挂 ILA2 ----
+(* mark_debug = "true" *) wire [15:0] dbg_pk_ovf_cnt     = pk_ovf_cnt;
+(* mark_debug = "true" *) wire [15:0] dbg_pfwd_rd        = pump_fwd_rd;
+(* mark_debug = "true" *) wire [15:0] dbg_hard_err_cnt   = hard_err_cnt;
+(* mark_debug = "true" *) wire [15:0] dbg_soft_err_cnt   = soft_err_cnt;
+(* mark_debug = "true" *) wire [15:0] dbg_ch_up_evt      = ch_up_evt_cnt;
+(* mark_debug = "true" *) wire [15:0] dbg_pfwd_stuck_cnt = pfwd_stuck_cnt;
+(* mark_debug = "true" *) wire        dbg_pfwd_stuck     = pfwd_stuck;
+// ---- B 域(user_clk_b) ----
+(* mark_debug = "true" *) wire [15:0] dbg_echo_b_rx      = echo_b_rx_frames;
+(* mark_debug = "true" *) wire [15:0] dbg_echo_b_ovf_cnt = echo_b_ovf_cnt;
+(* mark_debug = "true" *) wire [15:0] dbg_hard_err_b_cnt = hard_err_b_cnt;
+(* mark_debug = "true" *) wire [15:0] dbg_soft_err_b_cnt = soft_err_b_cnt;
+(* mark_debug = "true" *) wire [15:0] dbg_ch_up_b_evt    = ch_up_b_evt_cnt;
+(* mark_debug = "true" *) wire        dbg_lane_up_b      = lane_up_b;
 
 endmodule
