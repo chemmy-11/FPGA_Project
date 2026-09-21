@@ -16,12 +16,11 @@
 - 🔄 **当前推进：真光链路（project_9）**——去内环（loopback 3'b000）+ 双笼 A↔B 版位流已产出（WNS=+1.008ns），待接线验证
 - ⏳ 后续：IBERT 眼图（空闲通道 C/Y10、D/Y8）→ 双板干线 → DDR/DMA 解冻 → 双模式转发 → 性能测量
 
-## 当前推进（2026-09-18）
+## 当前推进（2026-09-20）
 
-**project_9 · 真光链路版（Aurora 去 3'b010 内环）**
-- 单笼版（X1Y11）：首版位流 WNS=+0.936ns
-- **双笼版（A↔B 真光链路）**：A=Y11=X1Y11 + B=Y9=X1Y9（引脚见 `docs/参考_cross_FMC_4SFP_GTH引脚表_2026-08-27.md`）；克隆 Aurora IP → `aurora_64b66b_1`；B 侧远端镜像 + 512×80b FWFT 回显 FIFO，**数据渡光两次**（A.TX→B.RX→FIFO→B.TX→A.RX），A 侧数据通路零改动；位流 `out/aurora_udp_bridge.bit`（WNS=+1.008ns）
-- **待办（物理层归用户）**：两个 10G 模块插 A/B 两笼，LC 跳线直连 → 烧双笼版位流 → T23（link_ok=channel_up_a&channel_up_b）常亮 → ping/udp_verify 同 M2 判据；T23 不亮先把一端两纤对调。仅一个模块时插 A + LC 自环头走单笼自环。
+- ✅ **prj9 双笼真光链路判据全过（09-20，git f7c8be8）**：A(Y11)↔B(Y9) 双 10G 模块 + LC 跳线，数据渡光两次。判据：T23 常亮 + ping 20/20 + udp_verify 12/12 + 压力 36/36 + 复测 ping 10/10（无楔死），WNS=+1.006ns。
+- 🔍 本轮根因：帧泵 wr_full 二进制/格雷混比，累计字节跨 2048 回绕后永久伪满（25 帧后全路径楔死）。仿真复现+修复验证（`project_9/sim/`），详见知识库《调试记录_prj9_帧泵格雷满判_2026-09-20》。
+- ⏭️ 下一步：IBERT 眼图观测（同 quad 空闲通道 C/D，或换装位流）→ 双板干线 → DDR/DMA 解冻
 
 ## 工程索引（状态一览）
 
@@ -38,59 +37,3 @@
 ### 🔄 正在推进
 
 | 目录 | 工程 | 状态 | 说明 |
-|---|---|---|---|
-| `project_9/` | **真光链路版（单笼/双笼 A↔B）** | 🔄 位流就绪，待接线验证 | project_8 全部验证资产复用（含 rgmii_rx_fix2 IDELAY 1250ps），loopback 3'b010→3'b000；双笼版架构见上文"当前推进" |
-
-### ⏸️ 挂起（位流在库，恢复即用）
-
-| 目录/课题 | 挂起时间 / 原因 | 恢复触发 |
-|---|---|---|
-| `project_4/` MIG/DDR4 验证 | 08-31（决策 #5，导师指示先做网口+SFP） | DDR 解冻 / 做缓存转发与 DMA 对接 |
-| `aurora_64b66b_loop_ex/` 串口桥 M-D 三级验证 | 09-04：链路健康但桥出复位 | 解 dbg 探针时钟域 undefined + AE33 输入方向 |
-| `project_7/` UDP+SFP 前端内环 | 09-04（决策 #10，架构定版后让位数据级桥） | 光电转/带 SFP 口交换机到位，或多端点形态复用 |
-| 8b/10b 裸调 GT 练手 | 08-27（决策 #2，物理层已由 IBERT 覆盖） | 需要裸层参照（Aurora 排障）或答辩补充 |
-
-### 🗄️ 归档 / 工具
-
-| 目录 | 说明 |
-|---|---|
-| `project_2/` | IBERT 主工程（结论已入 ibert 例程） |
-| `project_3/` | Aurora IP 主工程（64b/66b 定版 xci：10G duplex X1Y11） |
-| `0DMA_uart2ddr/` | 旧 DMA 实验（DDR 搁置期间预研） |
-| `scripts/` | Tcl 骨架三件套：create_project / bd_mb_minimal / build / env_check |
-| `KU_IO.xdc`（根） · `docs/KU引脚表.xlsx` | 官方板卡引脚表（GBK 编码；时钟 AK17 差分 / 复位 AC34） |
-| `docs/参考_cross_FMC_4SFP_GTH引脚表_2026-08-27.md` | FMC 四光口引脚速查（GT Quad X1Y2：A=X1Y11、B=X1Y9、C=X1Y10、D=X1Y8；控制脚版本 A） |
-| `docs/` | **文档中心**：操作文档脱敏快照（含挂起区）+ 交接/参考/里程碑文档；命名规范 `[阶段]_prj标识_概要_YYYY-MM-DD`（见 `docs/README.md` 与 `AGENTS.md`「文档规范」） |
-
-## 硬件基线（实测定论）
-
-- part = **`xcku060-ffva1156-2-i`（非 CIV）**；100MHz 差分晶振（AK17/AK16）；复位 AC34（低有效）
-- 板载网口：双千兆 RGMII（GE1/GE2，YT8531 PHY）；FMC 四光口（GT Quad X1Y2，A=X1Y11，参考钟 T6/T5@156.25MHz）
-- JTAG：板载 FT2232H；本机调试烧录走 Digilent USB-JTAG（210512180081，hw_server 自动识别）；串口 = FT2232H-B 通道（COM7，注册表 SERIALCOMM 实证）
-
-## PC 侧验证三板斧（判据闭环）
-
-```powershell
-# 0) 断电重上电后位流易失 → 重烧（一键判据脚本）
-powershell -File D:\FPGA\project_9\scripts\board_test_*.ps1
-# 1) 链路：T23 常亮（channel_up / link_ok 硬门控）
-# 2) 通路：
-ping 192.168.1.10 -n 20          # 0% 丢包、全 <1ms
-# 3) 数据（⚠️ 先关占用 1234 端口的程序）：
-$env:PYTHONUTF8 = 1              # 必须！GBK 控制台打 ✓ 会崩
-cd D:\FPGA\project_9
-python scripts\udp_verify.py    # 回显一致 12/12（长度覆盖 帧长%8 全部余数类）
-```
-
-佐证：Wireshark 过滤 `udp.port==1234`，请求/回显成对且 payload 相同。三层证明力：T23=链路、ping=通路、udp_verify=数据完整性。
-
-## 标准开发流程
-
-1. Vivado：设计 → 综合/实现 → Generate Bitstream → Export Hardware（含 bitstream）→ .xsa
-2. Hardware Manager：Program Device（成功标志 `End of startup status: HIGH`）
-3. Vitis：更新 .xsa → Run Configuration **取消 Program FPGA**（保留 Reset entire system）→ Run → 串口 9600
-4. 批处理构建：`vivado -mode batch -source <script>.tcl`（幂等脚本见各工程 `scripts\`；⚠️ 需在纯 ASCII 工作目录运行）
-
----
-
-*状态以本文件 + git log 为准；里程碑判定与决策记录详见知识库《长期路线图 v4.1》。*

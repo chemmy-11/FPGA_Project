@@ -133,11 +133,13 @@ D:\FPGA\project_N\
 | 12 | python 打印 ✓ 崩溃 | GBK 控制台——`PYTHONUTF8=1` |
 | 13 | IBERT 与 Aurora 抢 GT | 同一 GT 通道不能二者并存——换装位流或用同 quad 空闲通道 |
 | 14 | 位流断电即失 | JTAG 烧录易失——每次上电重烧（board_test 一键脚本兜底）|
+| 15 | 真光链路 25 帧后全灭 | 帧泵 wr_full 二进制/格雷混比，跨 2048 回绕永久伪满——标准 Cummings 格雷满 + 帧原子性 + 复位对称（f7c8be8）；板上必现→仿真复现→修复三连 |
 
 ## 十、当前工程状态（一屏速览，详表见 README.md）
 
 - ✅ prj6 网口栈（09-04）· ✅ prj8 数据级桥 M2 判据全过（09-18，git 66ff43d）
-- 🔄 **prj9 双笼真光链路**（git 42f0ba2，WNS=+1.008ns，位流就绪）：双 10G 模块插 **A(Y11)/B(Y9)** + LC 跳线直连 → T23（link_ok=双 channel_up）常亮 → 判据同 M2。T23 不亮先对调一端两纤。
+- ✅ **prj9 双笼真光链路判据全过（09-20，f7c8be8）**：渡光两次，ping 20/20 + udp 12/12 + 压力 36/36 + 复测无楔死，WNS=+1.006ns
+- ⏭️ IBERT 眼图（空闲通道 C/D）→ 双板干线 → DDR/DMA 解冻
 - ⏭️ 连通后：IBERT 眼图（空闲通道 C/D）→ 双板干线 → DDR/DMA 解冻
 - ⏸️ 挂起区：project_4 MIG · 串口桥三级验证 · project_7 内环 · 8b/10b 练手（恢复触发条件见 README）
 
