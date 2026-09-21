@@ -27,6 +27,7 @@ def main():
     ap.add_argument("file")
     ap.add_argument("--chunk", type=int, default=1360)
     ap.add_argument("--window", type=int, default=4)
+    ap.add_argument("--pace-ms", type=float, default=0.25)
     ap.add_argument("--timeout-ms", type=float, default=10.0)
     ap.add_argument("--max-retry", type=int, default=8)
     ap.add_argument("--limit-bytes", type=int, default=0)
@@ -75,7 +76,7 @@ def main():
                     continue
                 if hashlib.md5(payload).hexdigest() == md5s[seq]:
                     recv[seq] = payload
-                    outstanding.pop(seq, None)
+                    outstanding.pop(seq, None)   # 无条件清(先收后登记的竞态: 主线程后登记会成僵尸)
                 else:
                     stats["corrupt"] += 1   # 损坏: 不 ACK, 留窗重发
 
@@ -84,15 +85,21 @@ def main():
 
     t0 = time.perf_counter()
     nxt = 0
+    last_send = 0.0
+    pace_s = args.pace_ms / 1000.0
     timeout_s = args.timeout_ms / 1000.0
     while len(recv) < n:
+        if time.perf_counter() - t0 > 120.0:
+            print("!! 超过 120s 未完成 - 中止(查板端状态/重烧)")
+            break
         now = time.perf_counter()
         with lock:
-            # 1) 填窗
-            while nxt < n and len(outstanding) < args.window:
+            # 1) 填窗(先登记后发送, 消 ACK 竞态; pace 保证帧间隔>=泵周转, 免盲发丢弃)
+            while nxt < n and len(outstanding) < args.window and now - last_send >= pace_s:
+                outstanding[nxt] = [now, 0]
                 pkt = struct.pack("<IH", nxt, len(chunks[nxt])) + chunks[nxt]
                 s.sendto(pkt, addr)
-                outstanding[nxt] = [now, 0]
+                last_send = time.perf_counter()
                 stats["sends"] += 1
                 nxt += 1
             # 2) 超时重发
@@ -103,9 +110,9 @@ def main():
                         print(f"!! 片 {seq} 重发 {cnt} 次未 ACK —— 放弃(链路/板端异常)")
                         done_evt.set()
                         break
+                    outstanding[seq] = [now, cnt + 1]
                     pkt = struct.pack("<IH", seq, len(chunks[seq])) + chunks[seq]
                     s.sendto(pkt, addr)
-                    outstanding[seq] = [now, cnt + 1]
                     stats["retx"] += 1
                     stats["sends"] += 1
         time.sleep(0.0002)
