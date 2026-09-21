@@ -24,6 +24,10 @@
 //   第 1 拍入队 pend，第 2 拍（tail_flush）入队余字。帧间必有空拍
 //   （帧泵握手保证 ≥5 拍），故不会丢输入字节；万一发生则以 o_overflow 单拍脉冲暴露
 //   （2026-09-21 由粘滞电平改为脉冲，配顶层 o_overflow 计数器给出事件幅度）。
+// 【判决修复(2026-09-21)】输出队列 2→16 深: 实测 Aurora TX 反压(tready 瞬时停顿)下
+//   2 深队列溢出, 且被丢的字恰为帧尾 tlast 字 → 帧边界被吞 → 相邻两帧合并成一根
+//   长帧 → PC 侧两帧成对消失(即"0.4% 相邻对丢失"的完整机制, 算术闭合 7×2+9×2=32)。
+//   16 深可吸收最坏反压深度, 从根上消灭丢字。
 //=============================================================================
 `timescale 1ns / 1ps
 
@@ -59,14 +63,14 @@ module axis_word_pack (
     reg        tail_flush;
 
     // ---- 输出队列（2 深，head/tail 各 1 位）----
-    reg [63:0] q_word [0:1];
-    reg [7:0]  q_keep [0:1];
-    reg        q_last [0:1];
-    reg        q_head, q_tail;
-    reg [1:0]  q_cnt;
+    reg [63:0] q_word [0:15];
+    reg [7:0]  q_keep [0:15];
+    reg        q_last [0:15];
+    reg [3:0]  q_head, q_tail;
+    reg [4:0]  q_cnt;
 
-    wire q_empty = (q_cnt == 2'd0);
-    wire q_full  = (q_cnt == 2'd2);
+    wire q_empty = (q_cnt == 5'd0);
+    wire q_full  = (q_cnt == 5'd16);
 
     assign m_tdata  = q_word[q_head];
     assign m_tkeep  = q_keep[q_head];
@@ -91,7 +95,7 @@ module axis_word_pack (
             asm_word <= 64'd0; asm_cnt <= 3'd0; frame_active <= 1'b0;
             pend_word <= 64'd0; pend_valid <= 1'b0;
             tail_word <= 64'd0; tail_keep <= 8'd0; tail_flush <= 1'b0;
-            q_head <= 1'b0; q_tail <= 1'b0; q_cnt <= 2'd0;
+            q_head <= 4'd0; q_tail <= 4'd0; q_cnt <= 5'd0;
             o_frame_cnt <= 16'd0; o_overflow <= 1'b0;
         end
         else begin
@@ -157,10 +161,10 @@ module axis_word_pack (
                     q_word[q_tail] <= en_word;
                     q_keep[q_tail] <= en_keep;
                     q_last[q_tail] <= en_last;
-                    q_tail <= ~q_tail;
+                    q_tail <= q_tail + 4'd1;
                 end
             end
-            if (pop) q_head <= ~q_head;
+            if (pop) q_head <= q_head + 4'd1;
 
             if (en && !q_full && pop) q_cnt <= q_cnt;          // 同时进出
             else if (en && !q_full)   q_cnt <= q_cnt + 2'd1;
