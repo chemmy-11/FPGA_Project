@@ -60,3 +60,9 @@ xelab.pb
 
 # ===== 时序报告（每次构建可重新生成）=====
 *.rpt
+
+# ===== prj9 运行产物（ILA 捕获 CSV / python 缓存 / 测试数据与日志，可再生）=====
+project_9/scripts/__pycache__/
+project_9/scripts/ila_*.csv
+project_9/iter_*.txt
+project_9/testdata/
