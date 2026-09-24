@@ -15,7 +15,6 @@
 - ✅ **M2 数据级桥（2026-09-18）**：PC UDP 数据穿越 Aurora 64b/66b 编解码往返——ping 10/10+20/20 全 <1ms、udp_verify 12/12 + 压力 36/36 逐字节一致；三根因（unpack 断流 / 帧泵 rd_empty off-by-one / RGMII RX 采样相位）全部修复闭环
 - ✅ **真光链路（project_9，2026-09-21）**：双笼 A(Y11)↔B(Y9) 真光路（数据渡光两次）判据全过——ping 20/20 + udp 12/12 + 压力 36/36 + 复测无楔死；帧泵格雷满判根因修复（f7c8be8）
 - ✅ **会话 JSON 传输质量评测（2026-09-21）**：质量档 100%+SHA 一致 / 性能档 99.84% @ 19.3 Mbps / 容量档测出系统串行上限 ~23 Mbps（工具 json_storm.py + storm_demo.ps1）
-- ⏳ 后续：帧泵 v2 多帧队列 → B 侧探针位流 → IBERT 眼图 → 双板干线 → DDR/DMA 解冻
 - ⏳ 后续：IBERT 眼图（空闲通道 C/Y10、D/Y8）→ 双板干线 → DDR/DMA 解冻 → 双模式转发 → 性能测量
 
 ## 当前推进（2026-09-21）
@@ -73,8 +72,8 @@
 ## PC 侧验证三板斧（判据闭环）
 
 ```powershell
-# 0) 断电重上电后位流易失 → 重烧（一键判据脚本）
-powershell -File D:\FPGA\project_9\scripts\board_test_*.ps1
+# 0) 断电重上电后位流易失 → 重烧（成功标志 PROGRAM_OK + 两行 时钟在跑）
+& 'D:\Xilinx\Vivado\2023.1\bin\vivado.bat' -mode batch -source D:\FPGA\project_9\scripts\program_board.tcl
 # 1) 链路：T23 常亮（channel_up / link_ok 硬门控）
 # 2) 通路：
 ping 192.168.1.10 -n 20          # 0% 丢包、全 <1ms
