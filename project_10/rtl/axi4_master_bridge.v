@@ -66,6 +66,8 @@ module axi4_master_bridge #(
     output reg  [15:0]  stat_ill_rd,    // illegal / out-of-range random read
     output reg  [15:0]  stat_noframe,   // SEQ read with no resident frame
     output reg  [15:0]  stat_bresp_err,
+    output reg  [15:0]  stat_len_err,   // W2-review D2: frames refused for length
+                                        // (>MAX_LEN / 0) + W_DRAIN bail-outs
     output reg  [8:0]   stat_outstanding, // slots currently FULL
     output reg  [7:0]   dbg_wr_slot,
     output reg  [7:0]   dbg_rd_slot,
@@ -137,14 +139,21 @@ module axi4_master_bridge #(
     //=========================================================================
     reg out_inc, out_dec;
 
+    // W2-review D1 FIX -- ONE DRIVER PER REG.
+    // out_inc is owned by the write FSM block (pulsed on commit in W_B),
+    // out_dec is owned by the read FSM block (pulsed on retire in R_FIN).
+    // They used to be cleared HERE as well, i.e. two procedural drivers on one
+    // reg.  Vivado resolves that as
+    //   CRITICAL WARNING [Synth 8-6859] multi-driven net on pin Q ...
+    //   CRITICAL WARNING [Synth 8-6858] ... constant driver preserved, other
+    //                                     driver is ignored
+    // so on hardware out_inc/out_dec were tied to 0 and stat_outstanding stayed
+    // FROZEN AT 0: no slot-full refusal, no SEQ pointer scan.  This block now
+    // only CONSUMES the two pulses.
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             stat_outstanding <= 9'd0;
-            out_inc <= 1'b0;
-            out_dec <= 1'b0;
         end else begin
-            out_inc <= 1'b0;
-            out_dec <= 1'b0;
             if (out_inc & ~out_dec)      stat_outstanding <= stat_outstanding + 9'd1;
             else if (~out_inc & out_dec) stat_outstanding <= stat_outstanding - 9'd1;
         end
@@ -164,6 +173,7 @@ module axi4_master_bridge #(
     reg [511:0] w_data_r;
     reg [63:0]  w_strb_r;
     reg         w_beat_full, w_slotfull;
+    reg [3:0]   w_drain_wait;           // W2-review D2: W_DRAIN liveness bound
 
     wire [7:0]  w_slot_next = stat_wm[7:0];
     wire        w_no_room   = full_bit[w_slot_next];
@@ -189,9 +199,11 @@ module axi4_master_bridge #(
             w_bidx <= 0; w_data_r <= 0; w_strb_r <= 0; w_beat_full <= 0; w_slotfull <= 0;
             wr_commit <= 0; wr_commit_slot <= 0; wr_commit_len <= 0;
             stat_wm <= 0; stat_wr_frame <= 0; stat_wr_stall <= 0; stat_bresp_err <= 0;
+            stat_len_err <= 0; out_inc <= 1'b0; w_drain_wait <= 4'd0;
             dbg_wr_slot <= 0; dbg_wr_cycles <= 0; dbg_wr_beats <= 0;
         end else begin
             wr_commit <= 1'b0;
+            out_inc   <= 1'b0;     // D1 FIX: this block is the ONLY driver of out_inc
 
             // byte assembly (only inside W_FILL); see W_PUSH for the handover
             if (w_consume) begin
@@ -220,7 +232,9 @@ module axi4_master_bridge #(
                     w_beat <= 8'd0; w_bi <= 8'd0; w_bidx <= 12'd0;
                     w_beat_full <= 1'b0; w_data_r <= 0; w_strb_r <= 0;
                     if (w_no_room | w_bad_len) begin
-                        wst <= W_DRAIN;                   // refuse: never overwrite
+                        wst          <= W_DRAIN;          // refuse: never overwrite
+                        w_drain_wait <= 4'd0;
+                        if (w_bad_len) stat_len_err <= stat_len_err + 16'd1;
                     end else begin
                         w_beats <= (wd_data + 16'd63) >> 6;
                         wst     <= W_WAIT;
@@ -281,9 +295,22 @@ module axi4_master_bridge #(
             W_DRAIN: begin   // refused frame: pull its bytes back out of the FIFO
                 if (w_pop >= w_len) begin
                     if (w_slotfull) stat_wr_stall <= stat_wr_stall + 16'd1;
-                    wst <= W_IDLE;
+                    w_drain_wait <= 4'd0;
+                    wst          <= W_IDLE;
                 end else if (w_drain_pop) begin
-                    w_pop <= w_pop + 16'd1;
+                    w_pop        <= w_pop + 16'd1;
+                    w_drain_wait <= 4'd0;
+                end else if (w_drain_wait == 4'd15) begin
+                    // W2-review D2 FIX -- liveness.  The descriptor claims more
+                    // bytes than the byte FIFO will ever supply (frame-side /
+                    // descriptor desync).  Never spin here: give up, count it and
+                    // resynchronise on the next descriptor.  An unrecoverable
+                    // hang must be structurally impossible.
+                    stat_len_err <= stat_len_err + 16'd1;
+                    w_drain_wait <= 4'd0;
+                    wst          <= W_IDLE;
+                end else begin
+                    w_drain_wait <= w_drain_wait + 4'd1;
                 end
             end
             default: wst <= W_IDLE;
@@ -337,9 +364,10 @@ module axi4_master_bridge #(
             r_beat_data <= 0; r_rnd <= 0;
             rd_retire <= 0; rd_retire_slot <= 0; rd_seq_slot <= 0;
             stat_rd_frame <= 0; stat_ill_rd <= 0; stat_noframe <= 0; dbg_rd_slot <= 0;
-            dbg_rd_cycles <= 0; dbg_rd_beats <= 0;
+            dbg_rd_cycles <= 0; dbg_rd_beats <= 0; out_dec <= 1'b0;
         end else begin
             rd_retire <= 1'b0;
+            out_dec   <= 1'b0;     // D1 FIX: this block is the ONLY driver of out_dec
             rf_wr_en  <= 1'b0;
             rd_wr_en  <= 1'b0;
             if (rstate != R_IDLE) dbg_rd_cycles <= dbg_rd_cycles + 32'd1;

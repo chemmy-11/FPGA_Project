@@ -70,6 +70,7 @@ module frame_mem_if #(
     output wire [15:0]  ro_ill_rd,
     output wire [15:0]  ro_noframe,
     output wire [15:0]  ro_bresp_err,
+    output wire [15:0]  ro_len_err,       // W2-review D2: length refusals / drain bail-outs
     output wire [8:0]   ro_outstanding,
     output wire [7:0]   ro_dbg_wr_slot,
     output wire [7:0]   ro_dbg_rd_slot,
@@ -195,10 +196,18 @@ module frame_mem_if #(
     reg         wdv_d;
     reg         frm_drop;
     reg         ud_push;
-    reg  [15:0] ud_len_r;      // latched frame length for the descriptor FIFO.
-                               // MUST be its own register: wcnt is cleared in the
-                               // same cycle ud_push is raised, so wiring ud_din to
-                               // wcnt would enqueue length 0 for every frame.
+    reg  [15:0] n_push;        // bytes of the current frame ACTUALLY enqueued
+    reg  [15:0] n_push_r;      // latched value that becomes the descriptor length.
+                               // W2-review D2 FIX: the descriptor length is the
+                               // number of bytes REALLY written into the byte FIFO
+                               // -- not wcnt, which counts bytes merely OFFERED by
+                               // the upstream.  The two diverge the moment ub_full
+                               // clips a frame (any frame > MAX_LEN, or an
+                               // upstream that violates the 1538 B contract), and
+                               // the bridge then drained w_len bytes that were not
+                               // there -> W_DRAIN never terminated.
+                               // MUST be its own register: n_push is cleared in the
+                               // same cycle ud_push is raised (same lesson as R3).
     reg  [15:0] u_wr_frame_cnt, u_buf_drop;
     reg  [31:0] u_hold_cycles;
 
@@ -213,15 +222,16 @@ module frame_mem_if #(
     assign wr_hold = ~can_accept;
 
     wire frm_drop_now = wr_first ? ~can_accept : frm_drop;
-    assign ub_wr_en   = wr_en & ~frm_drop_now & ~ub_full;
+    wire push_now     = wr_en & ~frm_drop_now & ~ub_full;   // byte really enters
+    assign ub_wr_en   = push_now;
 
-    assign ud_din  = ud_len_r;
+    assign ud_din  = n_push_r;      // == bytes actually in the FIFO (D2 fix)
     assign ud_wr_en= ud_push;
 
     always @(posedge user_clk or negedge user_rst_n) begin
         if (!user_rst_n) begin
             wcnt <= 16'd0; wdv_d <= 1'b0; frm_drop <= 1'b0; ud_push <= 1'b0;
-            ud_len_r <= 16'd0;
+            n_push <= 16'd0; n_push_r <= 16'd0;
             u_wr_frame_cnt <= 16'd0; u_buf_drop <= 16'd0; u_hold_cycles <= 32'd0;
         end else begin
             wdv_d   <= wr_en;
@@ -232,19 +242,24 @@ module frame_mem_if #(
                 if (wr_first) begin
                     frm_drop <= ~can_accept;
                     wcnt     <= 16'd1;
+                    n_push   <= push_now ? 16'd1 : 16'd0;
                     if (~can_accept) u_buf_drop <= u_buf_drop + 16'd1;
                 end else if (wcnt != 16'd0) begin
                     wcnt <= wcnt + 16'd1;
+                    if (push_now) n_push <= n_push + 16'd1;
                 end
             end
 
             if (wr_last) begin
-                if (~frm_drop && (wcnt != 16'd0)) begin
+                if (~frm_drop && (n_push != 16'd0)) begin
                     ud_push        <= 1'b1;
-                    ud_len_r       <= wcnt;
+                    n_push_r       <= n_push;    // D2 fix: descriptor == FIFO bytes
                     u_wr_frame_cnt <= u_wr_frame_cnt + 16'd1;
+                end else if (~frm_drop) begin
+                    u_buf_drop <= u_buf_drop + 16'd1;   // accepted, but no byte landed
                 end
-                wcnt <= 16'd0;
+                wcnt   <= 16'd0;
+                n_push <= 16'd0;
             end
         end
     end
@@ -329,7 +344,8 @@ module frame_mem_if #(
         .rd_wr_en(rdesc_wr_en), .rd_wr_data(rdesc_din),
         .stat_wm(ro_wm), .stat_wr_frame(ro_wr_frame), .stat_wr_stall(ro_wr_stall),
         .stat_rd_frame(ro_rd_frame), .stat_ill_rd(ro_ill_rd), .stat_noframe(ro_noframe),
-        .stat_bresp_err(ro_bresp_err), .stat_outstanding(ro_outstanding),
+        .stat_bresp_err(ro_bresp_err), .stat_len_err(ro_len_err),
+        .stat_outstanding(ro_outstanding),
         .dbg_wr_slot(ro_dbg_wr_slot), .dbg_rd_slot(ro_dbg_rd_slot),
         .dbg_wr_cycles(dbg_wr_cycles), .dbg_rd_cycles(dbg_rd_cycles),
         .dbg_wr_beats(dbg_wr_beats), .dbg_rd_beats(dbg_rd_beats),

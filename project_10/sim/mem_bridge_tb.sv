@@ -49,6 +49,7 @@ module mem_bridge_tb;
 
     // ---------------- ui side ----------------
     wire [15:0] ro_wm, ro_wr_frame, ro_wr_stall, ro_rd_frame, ro_ill_rd, ro_noframe, ro_bresp_err;
+    wire [15:0] ro_len_err;   // W2-review D2 counter (not printed: keeps the W2 verdict byte-identical)
     wire [8:0]  ro_outstanding;
     wire [7:0]  ro_dbg_wr_slot, ro_dbg_rd_slot;
     wire [31:0] dbg_wr_cycles, dbg_rd_cycles, dbg_wr_beats, dbg_rd_beats;
@@ -75,7 +76,7 @@ module mem_bridge_tb;
         .ui_clk(ui_clk), .ui_rst_n(ui_rst_n), .calib_ok(calib_ok),
         .ro_wm(ro_wm), .ro_wr_frame(ro_wr_frame), .ro_wr_stall(ro_wr_stall),
         .ro_rd_frame(ro_rd_frame), .ro_ill_rd(ro_ill_rd), .ro_noframe(ro_noframe),
-        .ro_bresp_err(ro_bresp_err), .ro_outstanding(ro_outstanding),
+        .ro_bresp_err(ro_bresp_err), .ro_len_err(ro_len_err), .ro_outstanding(ro_outstanding),
         .ro_dbg_wr_slot(ro_dbg_wr_slot), .ro_dbg_rd_slot(ro_dbg_rd_slot),
         .dbg_wr_cycles(dbg_wr_cycles), .dbg_rd_cycles(dbg_rd_cycles),
         .dbg_wr_beats(dbg_wr_beats), .dbg_rd_beats(dbg_rd_beats),
