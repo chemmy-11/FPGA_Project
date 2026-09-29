@@ -1,0 +1,427 @@
+//=============================================================================
+// axi4_master_bridge.v -- self-developed AXI4 512-bit master + slot manager
+//                         prj10 W2 (memory-in-the-loop), ui_clk domain only
+//-----------------------------------------------------------------------------
+// WHY (design rationale, for the defence):
+//  * AXI4 requires AWLEN with/before the write data, so a frame must be fully
+//    known before its burst is issued. That is the project's proven
+//    "store-and-forward a whole frame" policy (prj9 frame pump), not a new idea.
+//  * 4KB slots: frame <= 1538 B -> <= 24 beats of 64 B <= 1536 B < 4096 B, so a
+//    burst can NEVER cross an AXI 4KB boundary. No split logic is needed; the
+//    simulation monitor checks the arithmetic anyway.
+//  * The slot table (valid/len) is a single-clock (ui_clk) table; the frame side
+//    only receives (len, slot) through the read descriptor FIFO. One clock per
+//    table = no dual-domain table hazard.
+//  * Hard gate: no AW/AR is issued until init_calib_complete is seen in THIS
+//    clock domain (prj4 lesson: touching MIG before calibration hangs the FSM).
+//
+// SLOT POLICY (the "random read" contract, simulated in mem_bridge_tb.sv)
+//   FULL[slot] : the slot holds a frame that has not been read yet.
+//   write  : slot = wm[7:0]. If FULL[slot] -> REFUSE (stat_wr_stall++), the frame
+//            is drained and discarded: an unread frame is NEVER overwritten.
+//   read SEQ: serve rd_seq_slot (oldest unread), retire it, advance the pointer.
+//   read RND: slot = command slot. Slot never written (cmd >= wm while wm < 256)
+//            -> stat_ill_rd++ and clamp to wm-1. Clamped/commanded slot not FULL
+//            (already read or empty) -> stat_ill_rd++ and a defined empty answer.
+//            Random read of an unwritten slot is therefore DEFINED and COUNTED,
+//            never undefined behaviour.
+//=============================================================================
+`timescale 1ns/1ps
+
+module axi4_master_bridge #(
+    parameter [31:0] SLOT_BASE = 32'h0010_0000,   // 4KB-aligned slot region
+    parameter [15:0] MAX_LEN   = 16'd1538         // prj9 frame contract (chunk=1466)
+)(
+    // ---------------- ui_clk / reset / MIG gate ----------------
+    input  wire         clk,            // ui_clk  (~300 MHz per MIG report)
+    input  wire         rst_n,          // ui_clk domain reset, active low
+    input  wire         calib_ok,       // init_calib_complete, ui_clk domain
+
+    // ---------------- write byte stream (ui side of user->ui FIFO) ----------------
+    input  wire         wf_empty,
+    input  wire [7:0]   wf_data,
+    input  wire [12:0]  wf_level,       // conservative byte count available
+    output wire         wf_rd_en,
+    // ---------------- write descriptor (ui side of user->ui desc FIFO) ----------------
+    input  wire         wd_empty,
+    input  wire [15:0]  wd_data,        // frame length in bytes
+    output wire         wd_rd_en,
+
+    // ---------------- read byte stream (ui side of ui->user FIFO) ----------------
+    output reg          rf_wr_en,
+    output reg  [7:0]   rf_wr_data,
+    // ---------------- read command (ui side of user->ui cmd FIFO) ----------------
+    input  wire         rc_empty,
+    input  wire [8:0]   rc_data,        // {rnd, slot[7:0]}
+    output wire         rc_rd_en,
+    // ---------------- read descriptor (ui side of ui->user desc FIFO) ----------------
+    output reg          rd_wr_en,
+    output reg  [24:0]  rd_wr_data,     // {none, len[15:0], slot[7:0]}
+
+    // ---------------- status / counters (ui_clk domain, ILA-friendly) ----------------
+    output reg  [15:0]  stat_wm,        // write watermark = frames committed
+    output reg  [15:0]  stat_wr_frame,
+    output reg  [15:0]  stat_wr_stall,  // refused: no free slot (unread frame preserved)
+    output reg  [15:0]  stat_rd_frame,
+    output reg  [15:0]  stat_ill_rd,    // illegal / out-of-range random read
+    output reg  [15:0]  stat_noframe,   // SEQ read with no resident frame
+    output reg  [15:0]  stat_bresp_err,
+    output reg  [8:0]   stat_outstanding, // slots currently FULL
+    output reg  [7:0]   dbg_wr_slot,
+    output reg  [7:0]   dbg_rd_slot,
+    output reg  [31:0]  dbg_wr_cycles,  // ui cycles spent servicing a write frame
+    output reg  [31:0]  dbg_rd_cycles,  // ui cycles spent servicing a read frame
+    output reg  [31:0]  dbg_wr_beats,
+    output reg  [31:0]  dbg_rd_beats,
+
+    // ---------------- AXI4 master (512-bit data) ----------------
+    output wire [31:0]  m_axi_awaddr,
+    output wire [7:0]   m_axi_awlen,
+    output wire [2:0]   m_axi_awsize,
+    output wire [1:0]   m_axi_awburst,
+    output reg          m_axi_awvalid,
+    input  wire         m_axi_awready,
+    output wire [511:0] m_axi_wdata,
+    output wire [63:0]  m_axi_wstrb,
+    output wire         m_axi_wlast,
+    output reg          m_axi_wvalid,
+    input  wire         m_axi_wready,
+    input  wire [1:0]   m_axi_bresp,
+    input  wire         m_axi_bvalid,
+    output reg          m_axi_bready,
+    output wire [31:0]  m_axi_araddr,
+    output wire [7:0]   m_axi_arlen,
+    output wire [2:0]   m_axi_arsize,
+    output wire [1:0]   m_axi_arburst,
+    output reg          m_axi_arvalid,
+    input  wire         m_axi_arready,
+    input  wire [511:0] m_axi_rdata,
+    input  wire [1:0]   m_axi_rresp,
+    input  wire         m_axi_rlast,
+    input  wire         m_axi_rvalid,
+    output reg          m_axi_rready
+);
+
+    //=========================================================================
+    // 1. slot table (single clock domain: this one)
+    //=========================================================================
+    reg        full_bit [0:255];
+    reg [15:0] len_tab  [0:255];
+    reg [7:0]  rd_seq_slot;
+
+    integer ti;
+    reg        wr_commit;
+    reg [7:0]  wr_commit_slot;
+    reg [15:0] wr_commit_len;
+    reg        rd_retire;
+    reg [7:0]  rd_retire_slot;
+
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            for (ti = 0; ti < 256; ti = ti + 1) begin
+                full_bit[ti] <= 1'b0;
+                len_tab[ti]  <= 16'd0;
+            end
+        end else begin
+            if (wr_commit) begin
+                full_bit[wr_commit_slot] <= 1'b1;
+                len_tab [wr_commit_slot] <= wr_commit_len;
+            end
+            if (rd_retire)
+                full_bit[rd_retire_slot] <= 1'b0;   // retire wins on collision
+        end
+    end
+
+    //=========================================================================
+    // 2. slot occupancy counter (single driver)
+    //=========================================================================
+    reg out_inc, out_dec;
+
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            stat_outstanding <= 9'd0;
+            out_inc <= 1'b0;
+            out_dec <= 1'b0;
+        end else begin
+            out_inc <= 1'b0;
+            out_dec <= 1'b0;
+            if (out_inc & ~out_dec)      stat_outstanding <= stat_outstanding + 9'd1;
+            else if (~out_inc & out_dec) stat_outstanding <= stat_outstanding - 9'd1;
+        end
+    end
+
+    //=========================================================================
+    // 3. write FSM
+    //=========================================================================
+    localparam W_IDLE=3'd0, W_WAIT=3'd1, W_AW=3'd2, W_FILL=3'd3,
+               W_PUSH=3'd4, W_B=3'd5, W_DRAIN=3'd6;
+
+    reg [2:0]   wst;
+    reg [7:0]   w_slot, w_beat, w_bi;
+    reg [7:0]   w_beats;
+    reg [15:0]  w_len, w_pop;
+    reg [11:0]  w_bidx;
+    reg [511:0] w_data_r;
+    reg [63:0]  w_strb_r;
+    reg         w_beat_full, w_slotfull;
+
+    wire [7:0]  w_slot_next = stat_wm[7:0];
+    wire        w_no_room   = full_bit[w_slot_next];
+    wire        w_bad_len   = (wd_data == 16'd0) || (wd_data > MAX_LEN);
+    wire        w_consume   = (wst == W_FILL) && !wf_empty && !w_beat_full;
+    wire        w_drain_pop = (wst == W_DRAIN) && !wf_empty && (w_pop < w_len);
+
+    assign wf_rd_en = w_consume | w_drain_pop;
+    assign wd_rd_en = (wst == W_IDLE) && calib_ok && !wd_empty;
+
+    assign m_axi_awaddr  = SLOT_BASE + {w_slot, 12'b0};
+    assign m_axi_awlen   = w_beats - 8'd1;
+    assign m_axi_awsize  = 3'b110;      // 64 bytes per beat (512-bit)
+    assign m_axi_awburst = 2'b01;       // INCR
+    assign m_axi_wdata   = w_data_r;
+    assign m_axi_wstrb   = w_strb_r;
+    assign m_axi_wlast   = (w_beat == (w_beats - 8'd1));
+
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            wst <= W_IDLE; m_axi_awvalid <= 0; m_axi_wvalid <= 0; m_axi_bready <= 0;
+            w_slot <= 0; w_beat <= 0; w_bi <= 0; w_beats <= 0; w_len <= 0; w_pop <= 0;
+            w_bidx <= 0; w_data_r <= 0; w_strb_r <= 0; w_beat_full <= 0; w_slotfull <= 0;
+            wr_commit <= 0; wr_commit_slot <= 0; wr_commit_len <= 0;
+            stat_wm <= 0; stat_wr_frame <= 0; stat_wr_stall <= 0; stat_bresp_err <= 0;
+            dbg_wr_slot <= 0; dbg_wr_cycles <= 0; dbg_wr_beats <= 0;
+        end else begin
+            wr_commit <= 1'b0;
+
+            // byte assembly (only inside W_FILL); see W_PUSH for the handover
+            if (w_consume) begin
+                w_data_r[w_bi*8 +: 8] <= wf_data;
+                w_strb_r[w_bi]        <= (w_bidx < w_len);
+                w_bidx                <= w_bidx + 12'd1;
+                // beat complete when 64 bytes are in OR the frame is exhausted
+                // (tail beat: wstrb marks exactly the valid bytes)
+                if ((w_bi == 8'd63) || ((w_bidx + 12'd1) == w_len)) w_beat_full <= 1'b1;
+                else                                                 w_bi        <= w_bi + 8'd1;
+            end
+            if (wst != W_IDLE) dbg_wr_cycles <= dbg_wr_cycles + 32'd1;
+
+            case (wst)
+            //-----------------------------------------------------------------
+            W_IDLE: begin
+                m_axi_awvalid <= 1'b0;
+                m_axi_wvalid  <= 1'b0;
+                m_axi_bready  <= 1'b0;
+                if (wd_rd_en) begin                       // descriptor pops this cycle
+                    w_len     <= wd_data;
+                    w_pop     <= 16'd0;
+                    w_slot    <= w_slot_next;
+                    w_slotfull<= w_no_room;
+                    dbg_wr_slot <= w_slot_next;
+                    w_beat <= 8'd0; w_bi <= 8'd0; w_bidx <= 12'd0;
+                    w_beat_full <= 1'b0; w_data_r <= 0; w_strb_r <= 0;
+                    if (w_no_room | w_bad_len) begin
+                        wst <= W_DRAIN;                   // refuse: never overwrite
+                    end else begin
+                        w_beats <= (wd_data + 16'd63) >> 6;
+                        wst     <= W_WAIT;
+                    end
+                end
+            end
+            //-----------------------------------------------------------------
+            W_WAIT: begin   // wait until every byte of this frame is visible
+                if (wf_level >= w_len[12:0]) wst <= W_AW;
+            end
+            //-----------------------------------------------------------------
+            W_AW: begin
+                m_axi_awvalid <= 1'b1;
+                if (m_axi_awvalid && m_axi_awready) begin
+                    m_axi_awvalid <= 1'b0;
+                    wst <= W_FILL;
+                end
+            end
+            //-----------------------------------------------------------------
+            W_FILL: begin
+                if (w_beat_full) wst <= W_PUSH;
+            end
+            //-----------------------------------------------------------------
+            W_PUSH: begin
+                m_axi_wvalid <= 1'b1;
+                if (m_axi_wvalid && m_axi_wready) begin
+                    m_axi_wvalid <= 1'b0;
+                    w_beat_full  <= 1'b0;
+                    w_bi         <= 8'd0;
+                    dbg_wr_beats <= dbg_wr_beats + 32'd1;
+                    if (w_beat == (w_beats - 8'd1)) begin
+                        wst <= W_B;
+                    end else begin
+                        w_beat <= w_beat + 8'd1;
+                        wst    <= W_FILL;
+                    end
+                end
+            end
+            //-----------------------------------------------------------------
+            W_B: begin
+                m_axi_bready <= 1'b1;
+                if (m_axi_bvalid && m_axi_bready) begin
+                    m_axi_bready <= 1'b0;
+                    if (m_axi_bresp == 2'b00) begin
+                        wr_commit       <= 1'b1;
+                        wr_commit_slot  <= w_slot;
+                        wr_commit_len   <= w_len;
+                        out_inc         <= 1'b1;
+                        stat_wm         <= stat_wm + 16'd1;
+                        stat_wr_frame   <= stat_wr_frame + 16'd1;
+                    end else begin
+                        stat_bresp_err <= stat_bresp_err + 16'd1;
+                    end
+                    wst <= W_IDLE;
+                end
+            end
+            //-----------------------------------------------------------------
+            W_DRAIN: begin   // refused frame: pull its bytes back out of the FIFO
+                if (w_pop >= w_len) begin
+                    if (w_slotfull) stat_wr_stall <= stat_wr_stall + 16'd1;
+                    wst <= W_IDLE;
+                end else if (w_drain_pop) begin
+                    w_pop <= w_pop + 16'd1;
+                end
+            end
+            default: wst <= W_IDLE;
+            endcase
+        end
+    end
+
+    //=========================================================================
+    // 4. read FSM
+    //=========================================================================
+    localparam R_IDLE=3'd0, R_AR=3'd1, R_R=3'd2, R_UNPACK=3'd3, R_FIN=3'd4;
+
+    reg [2:0]   rstate;
+    reg [7:0]   r_slot, r_beat, r_bi, r_beats;
+    reg [15:0]  r_len;
+    reg [6:0]   r_nbytes;        // meaningful bytes in the current beat (<=64)
+    reg [511:0] r_beat_data;
+    reg         r_rnd;
+
+    wire [7:0]  cmd_slot   = rc_data[7:0];
+    wire        cmd_rnd    = rc_data[8];
+    wire [7:0]  clamp_slot = (stat_wm == 16'd0) ? 8'd0 : (stat_wm[7:0] - 8'd1);
+    wire        in_range   = (stat_wm >= 16'd256) || (cmd_slot < stat_wm[7:0]);
+    wire [7:0]  eff_slot   = cmd_rnd ? (in_range ? cmd_slot : clamp_slot) : rd_seq_slot;
+    wire        rd_target_ok = (stat_wm != 16'd0) && full_bit[eff_slot];
+    // SEQ = "oldest unread slot". The pointer is scanned forward until it lands on
+    // a FULL slot, so SEQ stays correct even if RND reads have already retired
+    // arbitrary slots (mixed-mode safety, see the W2 note 6.3).
+    wire        seq_ok   = cmd_rnd | full_bit[rd_seq_slot] | (stat_outstanding == 9'd0);
+
+    assign rc_rd_en = (rstate == R_IDLE) && calib_ok && !rc_empty && seq_ok;
+
+    assign m_axi_araddr  = SLOT_BASE + {r_slot, 12'b0};
+    assign m_axi_arlen   = r_beats - 8'd1;
+    assign m_axi_arsize  = 3'b110;
+    assign m_axi_arburst = 2'b01;
+
+    // meaningful bytes in the current read beat
+    always @(*) begin
+        if (r_beat == (r_beats - 8'd1))
+            r_nbytes = (r_len[5:0] == 6'd0) ? 7'd64 : {1'b0, r_len[5:0]};
+        else
+            r_nbytes = 7'd64;
+    end
+
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            rstate <= R_IDLE; m_axi_arvalid <= 0; m_axi_rready <= 0;
+            rf_wr_en <= 0; rf_wr_data <= 0; rd_wr_en <= 0; rd_wr_data <= 0;
+            r_slot <= 0; r_beat <= 0; r_bi <= 0; r_beats <= 0; r_len <= 0;
+            r_beat_data <= 0; r_rnd <= 0;
+            rd_retire <= 0; rd_retire_slot <= 0; rd_seq_slot <= 0;
+            stat_rd_frame <= 0; stat_ill_rd <= 0; stat_noframe <= 0; dbg_rd_slot <= 0;
+            dbg_rd_cycles <= 0; dbg_rd_beats <= 0;
+        end else begin
+            rd_retire <= 1'b0;
+            rf_wr_en  <= 1'b0;
+            rd_wr_en  <= 1'b0;
+            if (rstate != R_IDLE) dbg_rd_cycles <= dbg_rd_cycles + 32'd1;
+
+            case (rstate)
+            //-----------------------------------------------------------------
+            R_IDLE: begin
+                m_axi_arvalid <= 1'b0;
+                m_axi_rready  <= 1'b0;
+                // SEQ pointer scan (1 slot / ui cycle, no command is consumed)
+                if (!cmd_rnd && !full_bit[rd_seq_slot] && (stat_outstanding != 9'd0))
+                    rd_seq_slot <= rd_seq_slot + 8'd1;
+                if (rc_rd_en) begin
+                    r_rnd <= cmd_rnd;
+                    if (cmd_rnd && !in_range) stat_ill_rd <= stat_ill_rd + 16'd1;
+                    if (!rd_target_ok) begin
+                        if (!cmd_rnd)            stat_noframe <= stat_noframe + 16'd1;
+                        else if (in_range)       stat_ill_rd  <= stat_ill_rd  + 16'd1;
+                        // defined empty answer (zero-length frame)
+                        rd_wr_en    <= 1'b1;
+                        rd_wr_data  <= {1'b1, 16'd0, 8'hFF};
+                        dbg_rd_slot <= 8'hFF;
+                    end else begin
+                        r_slot  <= eff_slot;
+                        r_len   <= len_tab[eff_slot];
+                        r_beats <= (len_tab[eff_slot] + 16'd63) >> 6;
+                        r_beat  <= 8'd0;
+                        dbg_rd_slot <= eff_slot;
+                        rstate  <= R_AR;
+                    end
+                end
+            end
+            //-----------------------------------------------------------------
+            R_AR: begin
+                m_axi_arvalid <= 1'b1;
+                if (m_axi_arvalid && m_axi_arready) begin
+                    m_axi_arvalid <= 1'b0;
+                    rstate <= R_R;
+                end
+            end
+            //-----------------------------------------------------------------
+            R_R: begin
+                // AXI handshake: READY must be high in the SAME cycle that VALID
+                // is sampled. Asserting rready only while rvalid is still low (and
+                // dropping it on the first rvalid) never completes the transfer on
+                // the slave side -> the slave stays mid-burst and the next AR is
+                // never accepted (W2 bring-up bug: bridge stuck in R_AR).
+                m_axi_rready <= 1'b1;
+                if (m_axi_rvalid && m_axi_rready) begin
+                    m_axi_rready <= 1'b0;
+                    r_beat_data  <= m_axi_rdata;
+                    r_bi         <= 8'd0;
+                    dbg_rd_beats <= dbg_rd_beats + 32'd1;
+                    rstate       <= R_UNPACK;
+                end
+            end
+            //-----------------------------------------------------------------
+            R_UNPACK: begin   // 1 byte / ui cycle into the ui->user byte FIFO
+                rf_wr_en   <= 1'b1;
+                rf_wr_data <= r_beat_data[r_bi*8 +: 8];
+                if (r_bi == (r_nbytes - 7'd1)) begin
+                    r_bi <= 8'd0;
+                    if (r_beat == (r_beats - 8'd1)) rstate <= R_FIN;
+                    else begin r_beat <= r_beat + 8'd1; rstate <= R_R; end
+                end else begin
+                    r_bi <= r_bi + 8'd1;
+                end
+            end
+            //-----------------------------------------------------------------
+            R_FIN: begin
+                rd_retire      <= 1'b1;
+                rd_retire_slot <= r_slot;
+                out_dec        <= 1'b1;
+                stat_rd_frame  <= stat_rd_frame + 16'd1;
+                if (!r_rnd) rd_seq_slot <= rd_seq_slot + 8'd1;
+                rd_wr_en   <= 1'b1;
+                rd_wr_data <= {1'b0, r_len, r_slot};
+                rstate     <= R_IDLE;
+            end
+            default: rstate <= R_IDLE;
+            endcase
+        end
+    end
+
+endmodule
