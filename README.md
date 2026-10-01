@@ -1,7 +1,7 @@
 # FPGA_Project — FPGA 高速互联网络平台
 
 [![Vivado](https://img.shields.io/badge/Vivado-2023.1-e8590c?style=flat)](scripts/)
-[![FPGA](https://img.shields.io/badge/FPGA-Kintex_UltraScale_XCKU060-0b7285?style=flat)](prj/)
+[![FPGA](https://img.shields.io/badge/FPGA-XCKU060-0b7285?style=flat)](prj/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue?style=flat)](LICENSE)
 [![CI](https://github.com/chemmy-11/FPGA_Project/actions/workflows/ci.yml/badge.svg)](https://github.com/chemmy-11/FPGA_Project/actions/workflows/ci.yml)
 
