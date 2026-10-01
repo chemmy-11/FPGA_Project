@@ -1,0 +1,29 @@
+=== TIER Lw=2 Lr=9 (W_DLY=0 AR_LAT=8
+STAT counters: wm=585 wr_frame=585 rd_frame=585 wr_stall=1 ill_rd=3 noframe=0 bresp_err=0
+STAT axi: wr_beats=8202 rd_beats=8202 4k_violation=0 axi_proto_err=0
+STAT service: wr=933 ui-cycles/frame (3.11 us @300MHz)  rd=920 (3.07 us)  frame period 12.30 us
+STAT wstrb: full=7655 partial_tail=547 illegal=0
+=== prj10 W2 SIM: PASS (0 errors) ===
+ 
+=== TIER Lw=50 Lr=50 (W_DLY=48 AR_LAT=49
+STAT counters: wm=585 wr_frame=585 rd_frame=585 wr_stall=1 ill_rd=3 noframe=0 bresp_err=0
+STAT axi: wr_beats=8202 rd_beats=8202 4k_violation=0 axi_proto_err=0
+STAT service: wr=982 ui-cycles/frame (3.27 us @300MHz)  rd=961 (3.20 us)  frame period 12.30 us
+STAT wstrb: full=7655 partial_tail=547 illegal=0
+=== prj10 W2 SIM: PASS (0 errors) ===
+ 
+=== TIER Lw=200 Lr=200 (W_DLY=198 AR_LAT=199
+STAT counters: wm=585 wr_frame=585 rd_frame=585 wr_stall=1 ill_rd=3 noframe=0 bresp_err=0
+STAT axi: wr_beats=8202 rd_beats=8202 4k_violation=0 axi_proto_err=0
+STAT service: wr=1132 ui-cycles/frame (3.77 us @300MHz)  rd=1111 (3.70 us)  frame period 12.30 us
+STAT wstrb: full=7655 partial_tail=547 illegal=0
+=== prj10 W2 SIM: PASS (0 errors) ===
+ 
+=== TIER Lw=500 Lr=500 (W_DLY=498 AR_LAT=499
+STAT counters: wm=585 wr_frame=585 rd_frame=585 wr_stall=1 ill_rd=3 noframe=0 bresp_err=0
+STAT axi: wr_beats=8202 rd_beats=8202 4k_violation=0 axi_proto_err=0
+STAT service: wr=1432 ui-cycles/frame (4.77 us @300MHz)  rd=1155 (3.85 us)  frame period 12.30 us
+STAT wstrb: full=7655 partial_tail=547 illegal=0
+=== prj10 W2 SIM: PASS (0 errors) ===
+ 
+=== SWEEP DONE === 

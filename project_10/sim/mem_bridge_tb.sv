@@ -17,7 +17,13 @@
 //=============================================================================
 `timescale 1ns/1ps
 
-module mem_bridge_tb;
+// A2: top-level parameters so the latency sweep can re-elaborate with
+//     xelab -generic_top "AR_LAT_T=200" -generic_top "W_DLY_T=198"
+//     (defaults reproduce the W2 baseline exactly).
+module mem_bridge_tb #(
+    parameter integer AR_LAT_T = 8,   // read first-beat latency (ui cycles)
+    parameter integer W_DLY_T  = 0    // EXTRA write-response delay (ui cycles)
+)();
 
     // ---------------- clocks ----------------
     reg user_clk = 1'b0;
@@ -63,6 +69,32 @@ module mem_bridge_tb;
     wire [511:0] m_rdata;   wire [1:0] m_rresp;  wire m_rlast, m_rvalid, m_rready;
     wire [31:0]  mon_4k, mon_wb, mon_rb, mon_err;
 
+    // A1 sideband (37-signal AXI4 contract)
+    wire [3:0]   m_awid,  m_bid,  m_arid,  m_rid;
+    wire [0:0]   m_awlock, m_arlock;
+    wire [3:0]   m_awcache, m_arcache;
+    wire [2:0]   m_awprot,  m_arprot;
+    wire [3:0]   m_awqos,   m_arqos;
+
+    // ---- A3: tail-beat WSTRB legality monitor (independent of the model) ----
+    // The bridge emits wstrb = all-ones for full beats and an LSB-contiguous mask
+    // for the (single) tail beat: a mask is LSB-contiguous iff (s & (s+1)) == 0.
+    // Violations checked: (a) zero/non-contiguous partial mask;
+    //                     (b) a partial mask on a beat that is NOT the burst tail.
+    // (Frame-length correctness is already proven separately by byte-exact reads.)
+    int strb_full = 0, strb_partial = 0, strb_bad = 0;
+    always @(posedge ui_clk) begin
+        if (m_wvalid && m_wready) begin
+            if (m_wstrb == {64{1'b1}}) strb_full = strb_full + 1;
+            else begin
+                strb_partial = strb_partial + 1;
+                if (!((m_wstrb != 64'd0) && ((m_wstrb & (m_wstrb + 64'd1)) == 64'd0)))
+                    strb_bad = strb_bad + 1;
+                if (!m_wlast) strb_bad = strb_bad + 1;
+            end
+        end
+    end
+
     // ---------------- DUT + DDR stand-in ----------------
     frame_mem_if #(.SLOT_BASE(32'h0010_0000), .MAX_LEN(16'd1538)) dut (
         .user_clk(user_clk), .user_rst_n(user_rst_n),
@@ -88,9 +120,14 @@ module mem_bridge_tb;
         .m_axi_araddr(m_araddr), .m_axi_arlen(m_arlen), .m_axi_arsize(m_arsize),
         .m_axi_arburst(m_arburst), .m_axi_arvalid(m_arvalid), .m_axi_arready(m_arready),
         .m_axi_rdata(m_rdata), .m_axi_rresp(m_rresp), .m_axi_rlast(m_rlast),
-        .m_axi_rvalid(m_rvalid), .m_axi_rready(m_rready));
+        .m_axi_rvalid(m_rvalid), .m_axi_rready(m_rready),
+        .m_axi_awid(m_awid), .m_axi_awlock(m_awlock), .m_axi_awcache(m_awcache),
+        .m_axi_awprot(m_awprot), .m_axi_awqos(m_awqos), .m_axi_bid(m_bid),
+        .m_axi_arid(m_arid), .m_axi_arlock(m_arlock), .m_axi_arcache(m_arcache),
+        .m_axi_arprot(m_arprot), .m_axi_arqos(m_arqos), .m_axi_rid(m_rid));
 
-    axi4_ram_model #(.MEM_BYTES(1<<20), .AR_LAT(8), .STALL_EN(1)) u_ram (
+    axi4_ram_model #(.MEM_BYTES(1<<20), .AR_LAT(AR_LAT_T), .W_RESP_DLY(W_DLY_T),
+                     .STALL_EN(1)) u_ram (
         .clk(ui_clk), .rst_n(ui_rst_n),
         .s_awaddr(m_awaddr), .s_awlen(m_awlen), .s_awsize(m_awsize), .s_awburst(m_awburst),
         .s_awvalid(m_awvalid), .s_awready(m_awready),
@@ -101,6 +138,10 @@ module mem_bridge_tb;
         .s_arvalid(m_arvalid), .s_arready(m_arready),
         .s_rdata(m_rdata), .s_rresp(m_rresp), .s_rlast(m_rlast),
         .s_rvalid(m_rvalid), .s_rready(m_rready),
+        .s_awid(m_awid), .s_awlock(m_awlock), .s_awcache(m_awcache),
+        .s_awprot(m_awprot), .s_awqos(m_awqos), .s_bid(m_bid),
+        .s_arid(m_arid), .s_arlock(m_arlock), .s_arcache(m_arcache),
+        .s_arprot(m_arprot), .s_arqos(m_arqos), .s_rid(m_rid),
         .mon_4k(mon_4k), .mon_wb(mon_wb), .mon_rb(mon_rb), .mon_err(mon_err));
 
     // ---------------- test state ----------------
@@ -435,8 +476,11 @@ module mem_bridge_tb;
         $display("STAT service: wr=%.0f ui-cycles/frame (%.2f us @300MHz)  rd=%.0f (%.2f us)  frame period 12.30 us",
                  wr_cpf, wr_cpf*3.3333/1000.0, rd_cpf, rd_cpf*3.3333/1000.0);
 
+        $display("STAT wstrb: full=%0d partial_tail=%0d illegal=%0d", strb_full, strb_partial, strb_bad);
+
         if (mon_4k != 0) fail("AXI 4KB boundary crossed");
         if (mon_err != 0) fail("AXI protocol/length error");
+        if (strb_bad != 0) fail("A3: WSTRB mask illegal (non-contiguous or partial on non-tail beat)");
 
         if (errs == 0) $display("=== prj10 W2 SIM: PASS (0 errors) ===");
         else           $display("=== prj10 W2 SIM: FAIL (%0d errors) ===", errs);

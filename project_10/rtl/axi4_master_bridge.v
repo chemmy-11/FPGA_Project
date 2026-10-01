@@ -101,7 +101,25 @@ module axi4_master_bridge #(
     input  wire [1:0]   m_axi_rresp,
     input  wire         m_axi_rlast,
     input  wire         m_axi_rvalid,
-    output reg          m_axi_rready
+    output reg          m_axi_rready,
+
+    // ---------------- AXI4 sideband (W3/A1: required by the real MIG) ----------------
+    // The real ddr4_0 exposes 37 s_axi signals; the W2 stand-in model only had 25.
+    // Evidence (project_4/D1_MIG断点核查 §3.1): awid/arid are FUNCTIONAL inside the
+    // MIG (r_channel.sv moves the ID into the read-transaction buffer and drives rid
+    // from it); bid/rid may dangle but the PORTS must exist.
+    output wire [3:0]   m_axi_awid,
+    output wire [0:0]   m_axi_awlock,
+    output wire [3:0]   m_axi_awcache,
+    output wire [2:0]   m_axi_awprot,
+    output wire [3:0]   m_axi_awqos,
+    input  wire [3:0]   m_axi_bid,
+    output wire [3:0]   m_axi_arid,
+    output wire [0:0]   m_axi_arlock,
+    output wire [3:0]   m_axi_arcache,
+    output wire [2:0]   m_axi_arprot,
+    output wire [3:0]   m_axi_arqos,
+    input  wire [3:0]   m_axi_rid
 );
 
     //=========================================================================
@@ -184,6 +202,22 @@ module axi4_master_bridge #(
     assign wf_rd_en = w_consume | w_drain_pop;
     assign wd_rd_en = (wst == W_IDLE) && calib_ok && !wd_empty;
 
+    // ---- A1: sideband constants -------------------------------------------
+    // awid/arid MUST be legal values. One ID per direction keeps the two streams
+    // distinguishable inside the MIG's ID-ordered buffers; each FSM here keeps
+    // exactly one burst in flight, so no re-order tracking is needed and bid/rid
+    // are intentionally not compared (only qualified by VALID).
+    assign m_axi_awid    = 4'h0;
+    assign m_axi_arid    = 4'h1;
+    assign m_axi_awlock  = 1'b0;
+    assign m_axi_arlock  = 1'b0;
+    assign m_axi_awcache = 4'h0;   // Normal Non-cacheable, non-bufferable
+    assign m_axi_arcache = 4'h0;
+    assign m_axi_awprot  = 3'h0;   // unprivileged, data, secure
+    assign m_axi_arprot  = 3'h0;
+    assign m_axi_awqos   = 4'h0;
+    assign m_axi_arqos   = 4'h0;
+
     assign m_axi_awaddr  = SLOT_BASE + {w_slot, 12'b0};
     assign m_axi_awlen   = w_beats - 8'd1;
     assign m_axi_awsize  = 3'b110;      // 64 bytes per beat (512-bit)
@@ -264,6 +298,15 @@ module axi4_master_bridge #(
                     m_axi_wvalid <= 1'b0;
                     w_beat_full  <= 1'b0;
                     w_bi         <= 8'd0;
+                    // ---- A3 FIX (2026-10-01) ----------------------------------
+                    // w_strb_r used to be cleared only at frame start, so on the
+                    // TAIL beat the lanes beyond the frame length kept the previous
+                    // beat's 1s: every frame whose length is not a multiple of 64 B
+                    // asserted a full 64-lane WSTRB and wrote up to 63 stale bytes
+                    // past the frame (measured: 64/64 beats "full", tail=0).
+                    // Clearing the mask per beat makes the tail beat exactly
+                    // (len mod 64) lanes wide; wstrb=0 lanes are not written by AXI.
+                    w_strb_r     <= 64'd0;
                     dbg_wr_beats <= dbg_wr_beats + 32'd1;
                     if (w_beat == (w_beats - 8'd1)) begin
                         wst <= W_B;

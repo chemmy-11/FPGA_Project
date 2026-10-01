@@ -69,3 +69,6 @@ project_9/testdata/
 
 # ===== MCP 桥的 Vivado 会话锁（瞬时文件，勿入库）=====
 .mcp-pilot-vivado.lock
+
+# ===== prj10 W3 前置工程（生成的 Vivado 工程目录，可由 scripts/*.tcl 幂等重建）=====
+project_10/prj_uiclk/vivado/

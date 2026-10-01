@@ -104,7 +104,21 @@ module frame_mem_if #(
     input  wire [1:0]   m_axi_rresp,
     input  wire         m_axi_rlast,
     input  wire         m_axi_rvalid,
-    output wire         m_axi_rready
+    output wire         m_axi_rready,
+
+    // ---------------- AXI4 sideband (W3/A1: passthrough to the real MIG) --------
+    output wire [3:0]   m_axi_awid,
+    output wire [0:0]   m_axi_awlock,
+    output wire [3:0]   m_axi_awcache,
+    output wire [2:0]   m_axi_awprot,
+    output wire [3:0]   m_axi_awqos,
+    input  wire [3:0]   m_axi_bid,
+    output wire [3:0]   m_axi_arid,
+    output wire [0:0]   m_axi_arlock,
+    output wire [3:0]   m_axi_arcache,
+    output wire [2:0]   m_axi_arprot,
+    output wire [3:0]   m_axi_arqos,
+    input  wire [3:0]   m_axi_rid
 );
 
     localparam BF_DEPTH = (1 << BF_AW);
@@ -357,6 +371,13 @@ module frame_mem_if #(
         .m_axi_araddr(m_axi_araddr), .m_axi_arlen(m_axi_arlen), .m_axi_arsize(m_axi_arsize),
         .m_axi_arburst(m_axi_arburst), .m_axi_arvalid(m_axi_arvalid), .m_axi_arready(m_axi_arready),
         .m_axi_rdata(m_axi_rdata), .m_axi_rresp(m_axi_rresp), .m_axi_rlast(m_axi_rlast),
-        .m_axi_rvalid(m_axi_rvalid), .m_axi_rready(m_axi_rready));
+        .m_axi_rvalid(m_axi_rvalid), .m_axi_rready(m_axi_rready),
+        // A1 sideband passthrough (37-signal AXI4 contract, see W3 前置清单 §五)
+        .m_axi_awid(m_axi_awid), .m_axi_awlock(m_axi_awlock),
+        .m_axi_awcache(m_axi_awcache), .m_axi_awprot(m_axi_awprot),
+        .m_axi_awqos(m_axi_awqos), .m_axi_bid(m_axi_bid),
+        .m_axi_arid(m_axi_arid), .m_axi_arlock(m_axi_arlock),
+        .m_axi_arcache(m_axi_arcache), .m_axi_arprot(m_axi_arprot),
+        .m_axi_arqos(m_axi_arqos), .m_axi_rid(m_axi_rid));
 
 endmodule

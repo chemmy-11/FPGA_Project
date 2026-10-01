@@ -69,6 +69,13 @@ module addr_check_core #(
     wire [511:0] m_rdata; wire [1:0] m_rresp; wire m_rlast, m_rvalid, m_rready;
     wire [31:0] mon_4k, mon_wb, mon_rb, mon_err;
 
+    // A1 sideband (37-signal AXI4 contract)
+    wire [3:0] m_awid, m_bid, m_arid, m_rid;
+    wire [0:0] m_awlock, m_arlock;
+    wire [3:0] m_awcache, m_arcache;
+    wire [2:0] m_awprot,  m_arprot;
+    wire [3:0] m_awqos,   m_arqos;
+
     frame_mem_if #(.SLOT_BASE(RTL_BASE), .MAX_LEN(16'd1538)) dut (
         .user_clk(user_clk), .user_rst_n(user_rst_n),
         .wr_data(wr_data), .wr_en(wr_en), .wr_hold(wr_hold),
@@ -93,7 +100,11 @@ module addr_check_core #(
         .m_axi_araddr(m_araddr), .m_axi_arlen(m_arlen), .m_axi_arsize(m_arsize),
         .m_axi_arburst(m_arburst), .m_axi_arvalid(m_arvalid), .m_axi_arready(m_arready),
         .m_axi_rdata(m_rdata), .m_axi_rresp(m_rresp), .m_axi_rlast(m_rlast),
-        .m_axi_rvalid(m_rvalid), .m_axi_rready(m_rready));
+        .m_axi_rvalid(m_rvalid), .m_axi_rready(m_rready),
+        .m_axi_awid(m_awid), .m_axi_awlock(m_awlock), .m_axi_awcache(m_awcache),
+        .m_axi_awprot(m_awprot), .m_axi_awqos(m_awqos), .m_axi_bid(m_bid),
+        .m_axi_arid(m_arid), .m_axi_arlock(m_arlock), .m_axi_arcache(m_arcache),
+        .m_axi_arprot(m_arprot), .m_axi_arqos(m_arqos), .m_axi_rid(m_rid));
 
     axi4_ram_model #(.MEM_BYTES(1<<20), .AR_LAT(8), .STALL_EN(1)) u_ram (
         .clk(ui_clk), .rst_n(ui_rst_n),
@@ -106,6 +117,10 @@ module addr_check_core #(
         .s_arvalid(m_arvalid), .s_arready(m_arready),
         .s_rdata(m_rdata), .s_rresp(m_rresp), .s_rlast(m_rlast),
         .s_rvalid(m_rvalid), .s_rready(m_rready),
+        .s_awid(m_awid), .s_awlock(m_awlock), .s_awcache(m_awcache),
+        .s_awprot(m_awprot), .s_awqos(m_awqos), .s_bid(m_bid),
+        .s_arid(m_arid), .s_arlock(m_arlock), .s_arcache(m_arcache),
+        .s_arprot(m_arprot), .s_arqos(m_arqos), .s_rid(m_rid),
         .mon_4k(mon_4k), .mon_wb(mon_wb), .mon_rb(mon_rb), .mon_err(mon_err));
 
     // ---------------- the three address checks ----------------
