@@ -1,6 +1,6 @@
 ---
 alias: prj9json_storm改造与E1E5执行前置_2026-09-29
-type: 操作文档
+type: 执行记录
 摘要: prj9 PC 侧就绪记录——json_storm.py 完成实操单 v2 §六 A2/A3/A4/A6 改造（预构造包/SO_SNDBUF 4MB/chunk 1466/忙等节奏器 --pace-us + 启动打印生效口径），并附全部离线自检证据（节奏器时序实测、环回 sendto 下界、A2 内存算术、干跑）；同轮修复 E5 工具 verdict_capture.ps1 的**已入库语法损坏 + 重复块假 PASS**（40 行 diff，三重证据），并给出 E1–E5「一条命令」执行口径与第一性原理四问算术
 created: 2026-09-29
 updated: 2026-09-29
