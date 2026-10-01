@@ -1,106 +1,139 @@
-# FPGA_Project — 毕设 FPGA 工程（工程索引）
+# FPGA_Project — FPGA 高速互联网络平台
 
-多 Agent 协同推理的 FPGA 交换节点：Kintex UltraScale **XCKU060** 实现**标准以太网 + 高速光互连**数据交换（缓存/直通双模式转发），参考 MoA 架构（ICLR 2025）。
+基于正点原子 KU060 开发板（Kintex UltraScale `xcku060-ffva1156-2-i`）搭建的多节点数据交换平台：
 
-**架构定位（2026-09-04 定版）**：端点/上位机通信 = **标准以太网（千兆）**；Aurora 64b/66b = **板间干线**（单板阶段用于数据级验证，接入多块板组交换网络时作为板间 10G 互联）。
+- **端点接入**：PC / 树莓派等标准以太网设备，经板载千兆 RJ45 网口接入
+- **板间干线**：Aurora 64b/66b 协议跑 10G 光纤（SFP+ 光口），多板互联时作为高速骨干
+- **板内转发**：数据可直通转发，也可整帧写入 DDR4 缓存后按需读出（大容量排队，拥塞调度的基础）
 
-> **给 Agent/协作者**：工程规范（事实源优先级、硬件事实卡、CDC/ILA/XDC 规范、调试方法论、坑账本）见 [`AGENTS.md`](AGENTS.md)。
+目标场景是边缘侧多节点协作推理：多块板子组成交换网络，承载节点间的大块数据（如模型分片、会话记录）传输。
 
-## 里程碑
+> 面向协作者：工程规范（事实源优先级、CDC/ILA/XDC 约定、调试方法论、坑账本）见 [`AGENTS.md`](AGENTS.md)。本 README 是入门第一份文档。
 
-- ✅ **M1（2026-08-11）**：Vitis 导入硬件平台，Hello World 串口打印成功（COM7@9600）
-- ✅ **IBERT 物理层（2026-08-27）**：10G PRBS 跨口跳线过纤，PLL Locked + 0E0（眼图已归档）
-- ✅ **Aurora 64b/66b 链路层（2026-08-31）**：内部环回，channel_up/lane_up/误码全 0（ILA）
-- ✅ **以太网上位机通道（2026-09-04）**：UDP/ARP/ICMP 栈 + 抓包验证（ping / 回环 / 四包链）
-- ✅ **M2 数据级桥（2026-09-18）**：PC UDP 数据穿越 Aurora 64b/66b 编解码往返——ping 10/10+20/20 全 <1ms、udp_verify 12/12 + 压力 36/36 逐字节一致；三根因（unpack 断流 / 帧泵 rd_empty off-by-one / RGMII RX 采样相位）全部修复闭环
-- ✅ **真光链路（project_9，2026-09-21）**：双笼 A(Y11)↔B(Y9) 真光路（数据渡光两次）判据全过——ping 20/20 + udp 12/12 + 压力 36/36 + 复测无楔死；帧泵格雷满判根因修复（f7c8be8）
-- ✅ **会话 JSON 传输质量评测（2026-09-21）**：质量档 100%+SHA 一致 / 单流 19.3 Mbps（PC 侧天花板）/ 并行回程 22.9 Mbps（测量下界，非结构极限——原「串行上限」归因已由设计报告 v0.5 §3.3.2 修正）/ 损坏乱序全程 0（工具 json_storm.py + storm_demo.ps1）
-- ✅ **prj10 W2 内存桥 RTL + 仿真（2026-09-29）**：自研 AXI4 512b 主机 + 槽表（valid/len）+ 帧侧 CDC；xsim 六用例全过（校准前零 AXI 活动 / 逐字节一致 / 乱序读 / 非法读定长应答 / 300 帧回绕 / 槽满零覆盖），AXI 4KB 违规 0；单桥服务 **3.11/3.07 µs 每帧**（帧周期 12.30 µs，节拍不变）——**未建 Vivado 工程、未上板**（`project_10/`）
-- ⏳ 后续（09-26 #14 定案：DDR 先行）：D 线 DDR4 队列（MIG 解冻）∥ prj10 W1（MIG 上板 J1，两线共用）→ W3 两级插桥 → 双板双链路组网 → 双模式转发 → IBERT 眼图 → 性能测量
+## 硬件平台
 
-> 📄 **上表各项"大致怎么做的"另见补充说明**：[`docs/导览_cross_已完成工作说明_2026-10-01.md`](docs/导览_cross_已完成工作说明_2026-10-01.md)——逐项展开 8 件已完成工作的内容、实现路径与结果，并附正在推进的 DDR 两步走（路线 A / 路线 B）。本 README 仍是入门第一份文档。
-
-## 当前推进（2026-09-30）
-
-- ✅ **prj9 真光链路判据全过（09-21，git f7c8be8）**：A(Y11)↔B(Y9) 双 10G 模块 + LC 跳线，数据渡光两次。T23 常亮 + ping 20/20 + udp 12/12 + 压力 36/36 + 复测无楔死，WNS=+1.006ns。
-- ✅ **会话 JSON 传输质量评测 + 0.4% 根因定案修复（09-21 晚）**：判决位流（三域 ILA）差分链算术闭合（pack 队列溢出吞 tlast → 帧合并 7×2+9×2=32）；队列 2→16 修复后全量 10MB **100%+SHA 一致**（历史首次）；真实业务传输层 json_reliable.py 交付 100%/0 重传。
-- ✅ **静态带宽预算定案（09-29，实操单 v2）**：第一性原理逐级核算——全链路上限 **≈957–959 Mbps**（帧泵B 12.21µs / 栈TX 12.24µs 双零裕量级），千兆口净载荷上限 953 Mbps；**19.3 Mbps = PC 侧 sleep、22.9 Mbps = 开环测量下界**（口径修正入设计报告 v0.5 §3.3.2）。**帧长契约：chunk=1466**（1472 会 IP 分片被板端全丢）。
-- ⏭️ **prj9 线速达标 E1–E5（实操单 v2，PC 侧 + 现有判决位流，零 RTL 改动）**：E1 单进程上限 → E2 背靠背冲击（兼冻结触发场景，单独排期）→ E3 受控节奏 ≥900 Mbps 无损（需 `--pace-us` 节奏器，~30 行脚本）→ E4 Wireshark 独立回程 → E5 计数器对账。
-- 🔍 **过载硬冻结根因待修**：第一候选已锁定（09-29）——`udp_tx.v` 长度锁存仅 idle 态，TX 忙时 rec_pkt_done 边沿丢失 → FIFO 帧错位（风险 R4）；泵A 看门狗 `dbg_pfwd_stuck_cnt` 已就位，E2 冻结复现即抓。
-- ✅🔬 **prj10 内存进环路 · W2 可开工部分已执行（09-29）**：按用户指示做"不依赖 Q1–Q5 拍板、不依赖物理层"的 W2——**内存桥 RTL（`async_fifo`/`axi4_master_bridge`/`frame_mem_if`）+ 行为级 AXI4 RAM 模型 + 六用例 testbench**，`=== prj10 W2 SIM: PASS (0 errors) ===`（`project_10/`，一键复现 `sim\run_sim.bat`）。**边界**：未建 Vivado 工程、未综合/未出流、未上板、`project_4`/`project_9` 零改动。**W2 实测修正开工草案 §九**：单桥服务 3.11/3.07 µs 每帧（草案只算 AXI 突发 0.16 µs，漏了 8b↔512b 逐字节转换）——结论不变，节拍仍是泵B/栈TX。旧三篇文档（架构草案、09-24/09-28 两份汇报）已整合挂起 `docs/操作文档/挂起/`；缺口体检见 `docs/结论_cross_prj9-prj10_进度体检报告_2026-09-29.md`；W2 执行记录见 `docs/调试记录/阶段三_prj10_内存桥RTL与仿真记录_2026-09-29.md`。
-- ✅📋 **prj10 规划闭环（09-30 导师定案 Q1–Q5）→ 实施单 v1.0**：**路线 A 先行**（先功能，再上软核 = 路线 B，三条接口预留保证不返工）· **Q2 读必须真随机；写怎么方便怎么写**——"只要存在一个地方，想取出来的时候能读出来就行" → 判据 **J3 + 新增 J3′ 可取出性**（集合级）· **Q3 本期地址由上位机控制**（UDP 命令字通道 + `GET_SLOT_MAP`），软核 + C 控制读写位置 = 后继理想态 · **Q4 单板**（本期不做双板）· **Q5 暂不要求提高端口速率**。执行文档 `docs/操作文档/阶段三_prj10_内存进环路开工草案_2026-09-29.md`（已升格 v1.0）。
-- ✅🔬 **prj10 二次核查（09-29 深夜，Agent Team 三线并行）**：① prj4 **位流确在库**（`impl_1/mig_verify_top.bit` 24.1 MB + `.ltx`，WNS=+0.024/WHS=+0.004 ns、引脚 112/112 与布线一致、ui_clk=300.12 MHz、DDR4=4 GiB）→ **W1/D1 只需一次上板**；② W2 的 PASS 边界写死（替身立即应答 + 地址取低 20 位 → 不覆盖 AXI4 端口与真 MIG 延迟），**设计点口径改写**为单桥 5.14/5.80 µs、两级桥串行 10.2–11.7 µs（裕量 1.05–1.20×），**约束是端口并发与延迟、不是带宽**；③ 修掉 2 个真缺陷（`out_inc/out_dec` **多驱动**——真综合 `[Synth 8-6858]` 保留常量驱动会让计数器恒 0；超长帧写 FSM 永久卡 `W_DRAIN`）+ 新增绝对地址断言；④ **W3 有 4 项硬阻断**（缺 12 个 AXI4 端口 / 时序零余量 / Lw·Lr 未实测 / 尾拍 WSTRB），见 `docs/操作文档/阶段三_prj10_W3前置清单_2026-09-29.md`。
-- ⏭️ **D 线（09-26 #14 导师定案：DDR 先行）**：D1 MIG 校准复验（prj4 位流在库，执行单已解冻回主线）→ D2 队列后端 DDR 化 → D3 判别复测 → D4 双模式 → D5 DMA；BRAM v2 = 回退。并行：双板双链路组网（KU060-② 已到位、光器件齐备零采购；跨板转发 = 最大技术风险）。**注**：prj10 定案 Q4「本期单板」后，D1/E1/W3 三项优先级不变，双板组网降为并行背景。
-
-## 工程索引（状态一览）
-
-### ✅ 已完成
-
-| 目录 | 工程 | 达成 | 说明 |
-|---|---|---|---|
-| `project_1/` | MicroBlaze 最小系统 | ✅ M1（08-11） | BD design_1：MicroBlaze + UART Lite + AXI Interconnect |
-| `ibert_ultrascale_gth_0/` | IBERT 眼图实验 | ✅ 08-27 | 10G PRBS 跨口过纤 0E0；眼图截图已归档 |
-| `aurora_64b66b_loop_ex/` | Aurora 例程 + UART 桥 | ✅ 08-31 内环验证 | 10G duplex X1Y11；`uart_bridge.v`（串口桥位流在库，验证挂起见下） |
-| `project_6/` | 以太网 UDP 网口栈 | ✅ 09-04 上板验证 | 官方 39_eth_udp_loop 整包移植；ping/UDP 回环/Wireshark 四包链 |
-| `project_8/` | **Aurora-UDP 数据级桥** | ✅ **M2（09-18）判据全过** | 以太网栈 + Aurora 64b/66b（X1Y11 内环）；axis_word_pack/unpack 8↔64 打包 + 双向帧泵；`rtl/*_dly.v` = IDELAY 1250ps 修复版；三根因排障脚本与 ILA 捕获数据在 `scripts/`；`docs\设计说明_*.md` |
-| `project_9/` | **真光链路版（单笼/双笼 A↔B）** | ✅ **真光链路判据全过（09-21）** | project_8 全部验证资产复用（含 rgmii_rx_fix2 IDELAY 1250ps），loopback 3'b000 正常模式；双笼 A(Y11)↔B(Y9) 渡光两次，判决位流 build9v/w（三域 ILA），见上文"当前推进" |
-
-### 🔄 正在推进
-
-| 目录 | 工程 | 状态 | 说明 |
-|---|---|---|---|
-| `project_4/` | **MIG/DDR4 队列缓存（D 线第一步）** | 🔄 09-26 解冻（#14 定案 DDR 先行） | 校准位流在库，D1 校准复验起步；D1→D5 见上文"当前推进"（从挂起区移入主线） |
-| `project_10/` | **内存进环路（DDR4 读写入数据面 · 随机读写）** | 🔄 **W2 ✅（09-29）· W3 开工文档就绪（09-30）** | Q1–Q5 已定案（09-30，路线图 #15）。W2 = 三层 RTL + 六用例 xsim PASS(0 errors)（替身口径，2 真缺陷已修）；**W3 = 第一级插桥 + 换真 MIG**，前置 B1–B4 已解锁，双轨执行（AI 离线 ∥ 用户三场次上板）见 `docs/操作文档/阶段三_prj10_W3两级插桥开工开发文档_2026-09-30.md`；执行文档 `docs/操作文档/阶段三_prj10_内存进环路开工草案_2026-09-29.md`（实施单 v1.0，里程碑状态已回填）；旧三篇挂起 `docs/操作文档/挂起/` |
-
-### ⏸️ 挂起（位流在库，恢复即用）
-
-| 目录/课题 | 挂起时间 / 原因 | 恢复触发 |
-|---|---|---|
-| `aurora_64b66b_loop_ex/` 串口桥 M-D 三级验证 | 09-04：链路健康但桥出复位 | 解 dbg 探针时钟域 undefined + AE33 输入方向 |
-| `project_7/` UDP+SFP 前端内环 | 09-04（决策 #10，架构定版后让位数据级桥） | 光电转/带 SFP 口交换机到位，或多端点形态复用 |
-| 8b/10b 裸调 GT 练手 | 08-27（决策 #2，物理层已由 IBERT 覆盖） | 需要裸层参照（Aurora 排障）或答辩补充 |
-
-### 🗄️ 归档 / 工具
-
-| 目录 | 说明 |
+| 项 | 事实 |
 |---|---|
-| `project_2/` | IBERT 主工程（结论已入 ibert 例程） |
-| `project_3/` | Aurora IP 主工程（64b/66b 定版 xci：10G duplex X1Y11） |
-| `0DMA_uart2ddr/` | **MicroBlaze + DDR4(MIG) + AXI DMA + UART 完整 BD 参考实现**（Vivado **2019.2**，`design_1_wrapper.bit` 2026-06-01 已出流）——D2/D5 的现成骨架；**是否真上板跑通未核实，勿当已验证资产**；亦未登记在 AGENTS.md 工程清单内（09-29 二次核查发现） |
-| `scripts/` | Tcl 骨架三件套：create_project / bd_mb_minimal / build / env_check |
-| `KU_IO.xdc`（根） · `docs/KU引脚表.xlsx` | 官方板卡引脚表（GBK 编码；时钟 AK17 差分 / 复位 AC34） |
-| `docs/参考_cross_FMC_4SFP_GTH引脚表_2026-08-27.md` | FMC 四光口引脚速查（GT Quad X1Y2：A=X1Y11、B=X1Y9、C=X1Y10、D=X1Y8；控制脚版本 A） |
-| `docs/` | **文档中心**：操作文档脱敏快照（含挂起区）+ 交接/参考/里程碑/规划/追踪/汇报/架构/结论文档（含短期待办、长期路线图 **v4.5（#15 prj10 Q1–Q5 定案）**、AI-Infra 设计报告 v0.5、prj10 实施单 v1.0 与 W2 记录与 W3 前置清单、prj4 D1 断点核查、prj9-prj10 体检报告二次版）；命名规范 `[阶段]_prj标识_概要_YYYY-MM-DD`（见 `docs/README.md` 与 `AGENTS.md`「文档规范」） |
+| FPGA | Kintex UltraScale `xcku060-ffva1156-2-i` |
+| 系统时钟 | 100 MHz 差分（AK17/AK16）；复位按键 AC34（低有效） |
+| 网口 | 双千兆 RGMII（YT8531 PHY），默认 GE1：PC `192.168.1.102` ↔ 板 `192.168.1.10` |
+| 光口 | FMC 四 SFP+ 笼（GT Quad X1Y2：A=X1Y11、B=X1Y9、C=X1Y10、D=X1Y8），参考钟 156.25 MHz |
+| 调试 | Digilent USB-JTAG 烧录；FT2232H 串口（COM7 @9600） |
+| 环境 | Vivado 2023.1；Python 3.10+（Windows 控制台需设 `PYTHONUTF8=1`） |
 
-## 硬件基线（实测定论）
+## 工程血缘
 
-- part = **`xcku060-ffva1156-2-i`（非 CIV）**；100MHz 差分晶振（AK17/AK16）；复位 AC34（低有效）
-- 板载网口：双千兆 RGMII（GE1/GE2，YT8531 PHY）；FMC 四光口（GT Quad X1Y2，A=X1Y11，参考钟 T6/T5@156.25MHz）
-- JTAG：板载 FT2232H；本机调试烧录走 Digilent USB-JTAG（210512180081，hw_server 自动识别）；串口 = FT2232H-B 通道（COM7，注册表 SERIALCOMM 实证）
+每个新工程只复用**已上板验证通过**的前序部件，官方例程永远是最高事实基准。箭头表示文件与验证资产的继承关系：
 
-## PC 侧验证三板斧（判据闭环）
-
-```powershell
-# 0) 断电重上电后位流易失 → 重烧（成功标志 PROGRAM_OK + 两行 时钟在跑）
-& 'D:\Xilinx\Vivado\2023.1\bin\vivado.bat' -mode batch -source D:\FPGA\project_9\scripts\program_board.tcl
-# 1) 链路：T23 常亮（channel_up / link_ok 硬门控）
-# 2) 通路：
-ping 192.168.1.10 -n 20          # 0% 丢包、全 <1ms
-# 3) 数据（⚠️ 先关占用 1234 端口的程序）：
-$env:PYTHONUTF8 = 1              # 必须！GBK 控制台打 ✓ 会崩
-cd D:\FPGA\project_9
-python scripts\udp_verify.py    # 回显一致 12/12（长度覆盖 帧长%8 全部余数类）
+```
+正点原子 KU060 官方例程库（本仓库全部工程的事实基准）
+│
+├─[例程39章 以太网UDP]──► project_6   千兆以太网 UDP 协议栈
+│        │               ARP / ICMP / UDP 收发回显，ping 0% 丢包
+│        │               ✅ 上板验证 2026-09-04
+│        │               （含 rgmii_rx_fix2：千兆 RGMII 接收采样时序修复）
+│        ▼
+│    project_7   SFP 光口承载以太网（内环验证）
+│        │       ⏸ 已封存 —— 端点接入统一改用 RJ45 网口后，此路线不再需要
+│        │
+│        │       帧缓冲泵 frame_fifo_pump 在本工程诞生：
+│        │       整帧缓存 + 跨时钟域搬运，此后成为所有数据通路的标配部件
+│        ▼
+├─[Aurora 64b/66b 例程]─┬► aurora_64b66b_loop_ex   官方例程留档 ⏸
+│  （时钟/复位/QPLL      └► project_3   Aurora 64b/66b 链路层（GT 内环）
+│   支撑逻辑随工程走）         channel_up / 零误码 ✅ 2026-08-31
+│                                   │
+│                                   ▼
+│                             project_8   Aurora-UDP 桥接
+│                             以太网帧穿过 Aurora 64b/66b 编解码后原样返回，
+│                             payload 逐字节一致 ✅ 2026-09-18
+│                             （= 例程39章协议栈 + Aurora例程支撑逻辑
+│                                + project_7 的帧缓冲泵，三者首次合体）
+│                                   │
+│                                   ▼
+│                             project_9   真实光纤链路验证
+│                             两个 SFP+ 光口 A↔B 用光纤对接，数据渡光纤往返，
+│                             10MB 文件 100% 到达 + SHA256 完全一致 ✅ 2026-09-21
+│                                   │
+│                                   └─fork──► project_10   DDR4 帧队列（开发中）
+│                                                 "内存进环路"：以太网帧写入 DDR4
+│                                                 再按帧读出，为大容量排队打地基；
+│                                                 复用 project_9 全套数据通路
+│                                                 🔄 逻辑与时序预检已收敛，待上板联调
+│                                                 ▲
+├─[MIG 例程]──► project_4   MIG DDR4 读写校准 ────┘
+│               🔄 校准复验待上板；向 project_10 提供 DDR4 控制器
+│
+└─[MicroBlaze 例程]──► project_1   MicroBlaze 软核最小系统 ✅ 2026-08-11
+                       跑通 FPGA 内软核 + Vitis 软件开发流；
+                       将来作为控制面（状态上报 / 队列配置）回归 project_10
 ```
 
-佐证：Wireshark 过滤 `udp.port==1234`，请求/回显成对且 payload 相同。三层证明力：T23=链路、ping=通路、udp_verify=数据完整性。
+**图例**：✅ 已上板验证闭环 · ⏸ 封存（保留入库，不再推进）· 🔄 进行中
 
-## 标准开发流程
+图外挂起支线：project_2（8b/10b 编解码练手，仅起步即跳过——物理层信号质量已由 IBERT 眼图实验覆盖，2026-08-27）；串口调试桥（在 `aurora_64b66b_loop_ex/` 例程目录内，上位机验证资料未收到）。
 
-1. Vivado：设计 → 综合/实现 → Generate Bitstream → Export Hardware（含 bitstream）→ .xsa
-2. Hardware Manager：Program Device（成功标志 `End of startup status: HIGH`）
-3. Vitis：更新 .xsa → Run Configuration **取消 Program FPGA**（保留 Reset entire system）→ Run → 串口 9600
-4. 批处理构建：`vivado -mode batch -source <script>.tcl`（幂等脚本见各工程 `scripts\`；⚠️ 需在纯 ASCII 工作目录运行）
+## 工程一览
+
+| 目录 | 内容 | 验证判据（怎么算"过"） | 状态 |
+|---|---|---|---|
+| `project_1/` | MicroBlaze 软核最小系统 | 串口打印 Hello World | ✅ 2026-08-11 |
+| `project_3/` | Aurora 64b/66b IP 配置定版 | GT 内环 channel_up、零误码 | ✅ 2026-08-31 |
+| `project_4/` | MIG DDR4 读写校准 | 校准完成 + 读写数据比对零误码；位流已产出 | 🔄 校准复验待上板 |
+| `project_6/` | 千兆以太网 UDP 协议栈 | ping 0% 丢包、UDP 回显逐字节一致、Wireshark 抓包核对 | ✅ 2026-09-04 |
+| `project_8/` | Aurora-UDP 桥接 | PC 发 UDP → 穿 Aurora 编解码往返 → payload 逐字节一致 | ✅ 2026-09-18 |
+| `project_9/` | 真实光纤链路全链路 | 光口 A↔B 对接，10MB 文件 100% 到达 + SHA256 一致 | ✅ 2026-09-21 |
+| `project_10/` | DDR4 帧队列（内存进环路） | 仿真六用例全过；真 MIG 综合时序收敛；上板联调待做 | 🔄 开发中 |
+| `project_2/` | 8b/10b 编解码练手（仅起步即跳过，物理层由 IBERT 实验覆盖） | — | ⏸ 封存 |
+| `project_7/` | SFP 光口以太网前端 | — | ⏸ 封存 |
+| `aurora_64b66b_loop_ex/` | Aurora 官方例程 + 串口调试桥 | 例程内环已验证；串口桥验证未完成 | ⏸ 留档 |
+| `ibert_ultrascale_gth_0/` | IBERT 物理层实验 | 10G PRBS 过纤零误码 + 眼图 | ✅ 2026-08-27 |
+| `0DMA_uart2ddr/` | MicroBlaze+MIG+DMA+UART 参考设计（Vivado 2019.2） | **未验证**，仅作参考骨架 | 🗄️ 归档 |
+
+## 快速开始（以 project_9 为例复现三层验证）
+
+一块 KU060 板 + 一根网线 + 一根 LC 光跳线（把光口 A、B 对接），三层判据依次证明"链路在 → 通路通 → 数据对"：
+
+```powershell
+# 1) 烧录位流（断电后位流易失，需重烧；脚本幂等）
+& 'D:\Xilinx\Vivado\2023.1\bin\vivado.bat' -mode batch -source D:\FPGA\project_9\scripts\program_board.tcl
+
+# 2) 链路层：板上 T23 LED 常亮 = Aurora 双通道链路建立（channel_up 硬门控）
+
+# 3) 网络层：ping 板卡
+ping 192.168.1.10 -n 20          # 判据：0% 丢包、全部 <1ms
+
+# 4) 数据层：UDP 回显校验（先关掉占用 1234 端口的程序）
+$env:PYTHONUTF8 = 1              # Windows 控制台必设，否则中文输出崩
+cd D:\FPGA\project_9
+python scripts\udp_verify.py     # 判据：回显一致 12/12
+```
+
+大文件完整性验证（数据真实穿过光纤往返）：`python scripts\json_storm.py <任意文件> --out recv.bin`，比对重组文件与源文件 SHA256。
+
+各工程 `scripts\` 下均有 `create_project / build / program` 幂等脚本，可在纯 ASCII 路径下一键重建工程。
+
+## 仓库结构
+
+```
+project_N/          各 Vivado 工程（rtl / sim / scripts / xdc / docs）
+aurora_64b66b_loop_ex/  Aurora 官方例程留档
+ibert_ultrascale_gth_0/ IBERT 眼图实验工程
+0DMA_uart2ddr/      MicroBlaze+DDR4+DMA 参考设计（未验证）
+docs/               文档中心：各工程的实操单、测试报告、调试记录（脱敏快照）
+AGENTS.md           工程规范：事实源优先级、硬件事实卡、CDC/ILA/XDC 约定、坑账本
+KU_IO.xdc           官方板卡引脚约束（事实基准）
+scripts/            顶层 Tcl 骨架
+```
+
+## 开发约定
+
+1. **官方例程 > 已上板验证的工程 > 板卡手册 > AI 生成内容**——冲突时按此优先级裁决。
+2. **官方文件不改动原件**：修复一律走"同名模块顶替"或"派生新文件"。
+3. **结论必须有判据**：每个"通过"都要落到可复现的证据（计数器对账 / 哈希比对 / 抓包），不接受"看起来能跑"。
+4. Vivado 相关路径全 ASCII（中文路径有 GBK 编码实坑）。
+5. 文档命名：`[阶段]_[工程]_[概要]_[日期].md`，详见 `docs/README.md`。
 
 ---
 
-*状态以本文件 + git log 为准；里程碑判定与决策记录详见知识库《长期路线图 v4.4》（快照：`docs/规划_cross_长期路线图_2026-09-04.md`）。*
+*各工程详细验证过程与排障记录见 `docs/`；工程状态以本文件与 git log 为准。*

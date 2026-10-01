@@ -146,15 +146,53 @@ D:\FPGA\project_N\
 | 20 | `xdc_lint` 对 GT 参考时钟报 `MISSING_IOSTANDARD`（**误报，别照改**） | `gt_refclk_p/n`（T6/T5 = MGTREFCLK1_X1Y2）是 **GT 专用引脚**，不需要也不应写 IOSTANDARD。事实源：官方 GT Wizard 例程 `gtwizard_ultrascale_0_example_top.xdc` L56-57 **同样只写 `package_pin`**（而同文件对 `sys_clk`/`sfp_rs` 等普通 IO 都写了 IOSTANDARD）；prj9 同写法综合日志 **0 条 NSTD-1/BIVC-1**。⇒ 见此类告警**先判端口是否为 GT 专用脚**，是则忽略 |
 | 21 | **vivado-mcp `start_session` 必失败（`RuntimeError: Vivado GUI 进程提前退出`）** | 0.3.26 把「`vivado_mcp_server.tcl` 的路径」写进一个只含 ASCII 的临时 `.tcl`（`D:\FPGA\tmpXXXX.tcl`）交给 `vivado -source`，而 **Vivado 的 Tcl 按系统 ANSI(GBK) 解码该文件** → 安装路径里的「毕设」解成「姣曡??」→ `couldn't read file ... no such file or directory`。与 #1 同根（GBK 码位）。**修法 = 把整个安装搬到纯 ASCII 路径**（2026-10-01 实做：`C:\Users\15266\Desktop\毕设\.mcp-pilot` → `D:\vivado-mcp`，含 venv+site）；`C:` 侧旧路径留转发壳。**注意 mcp 包自身的 `_check_ascii_paths` 已经把非 ASCII 路径列为红线**，但只查 vivado_path 与 cwd，**查不到包安装路径**——所以这条只能靠安装位置保证 |
 
-## 十、当前工程状态（一屏速览，详表见 README.md）
+## 十、当前工程状态（一屏速览；内部详表见本节附录）
+
+> **README 分工变更（2026-10-01）**：仓库 `README.md` 改为**面向组员/新手的外部门面**（工程血缘图 + 通俗一览 + 快速开始）。原 README 承载的**内部信息**（工程索引详表、docs 文档中心指向、标准开发流程、挂起区触发条件）全部迁入本节附录，内部协作只看 AGENTS.md。
 
 - ✅ prj6 网口栈（09-04）· ✅ prj8 数据级桥 M2 判据全过（09-18，git 66ff43d）
 - ✅ **prj9 双笼真光链路判据全过（09-21，f7c8be8）**：渡光两次，ping 20/20 + udp 12/12 + 压力 36/36 + 复测无楔死，WNS=+1.006ns
 - ✅ **会话 JSON 全量传输质量评测（09-21）**：质量档 100%+SHA 一致 · 单流 19.3 Mbps（PC 侧天花板）· 并行回程 22.9 Mbps（**测量下界，非结构极限**——原「串行上限」归因已由设计报告 v0.5 §3.3.2 修正）；损坏/乱序全程 0
 - ✅ **prj9 尾巴 = 全量传输 0.4% 丢失已定案修复（09-21 晚）**：判决位流 build9v（三域 ILA）差分链算术闭合——pack 输出队列 2 深溢出吞 tlast 字→相邻帧合并（7×2+9×2=32，git d9327bd）；队列 2→16（0ee2611）后全量 10MB **100%+SHA 一致**（历史首次）；真实业务传输层 json_reliable.py 交付 100%/0 重传
 - ⏭️ 下一步（09-26 导师定案：DDR 先行，路线图 #14）：**D 线 DDR4 队列缓存**——D1 MIG 校准复验（prj4 位流在库）→ D2 队列后端 DDR 化 → D3 判别复测 → D4 缓存/直通双模式 → D5 AXI DMA；BRAM v2 = 回退。并行：双板双链路组网（10G 模块 4 只 + LC 跳线 4 条已齐备，零采购）。后续：过载冻结根因（看门狗就位）→ IBERT 眼图（空闲通道 C/D）
-- 🔄 project_4 MIG 已解冻移入主线（#14，D1 校准复验起步）；⏸️ 挂起区：串口桥三级验证 · project_7 内环 · 8b/10b 练手（恢复触发条件见 README）
+- 🔄 project_4 MIG 已解冻移入主线（#14，D1 校准复验起步）；⏸️ 挂起区：串口桥三级验证 · project_7 内环 · 8b/10b 练手（恢复触发条件见本节附 A）
 - ✅🔬 **prj10 W2 内存桥 RTL + xsim 仿真（09-29）**：`project_10/`（三层 RTL + AXI4 RAM 替身 + 六用例 TB），`=== prj10 W2 SIM: PASS (0 errors) ===`；一键复现 `sim\run_sim.bat`（只用 xvlog/xelab/xsim，**未建 Vivado 工程/未上板**，prj4·prj9 零改动）。实测单桥服务 3.11/3.07 µs 每帧（开工草案 §九 漏算 8b↔512b 逐字节转换，已修正；节拍结论不变）。bring-up 修掉 AXI R 通道握手违规 / 尾拍不满 64B 卡死 / 描述符长度清零竞争三条真 BUG（见 vault 执行记录）
+
+### 附 A · 工程索引详表（内部视角，原 README 2026-10-01 迁入）
+
+**✅ 已完成**
+
+| 目录 | 工程 | 达成 | 说明 |
+|---|---|---|---|
+| `project_1/` | MicroBlaze 最小系统 | ✅ M1（08-11） | BD design_1：MicroBlaze + UART Lite + AXI Interconnect |
+| `ibert_ultrascale_gth_0/` | IBERT 眼图实验 | ✅ 08-27 | 10G PRBS 跨口过纤 0E0；眼图截图已归档 |
+| `aurora_64b66b_loop_ex/` | Aurora 例程 + UART 桥 | ✅ 08-31 内环验证 | 10G duplex X1Y11；`uart_bridge.v`（串口桥位流在库，验证挂起见下） |
+| `project_6/` | 以太网 UDP 网口栈 | ✅ 09-04 上板验证 | 官方 39_eth_udp_loop 整包移植；ping/UDP 回环/Wireshark 四包链 |
+| `project_8/` | Aurora-UDP 数据级桥 | ✅ M2（09-18）判据全过 | 以太网栈 + Aurora 64b/66b（X1Y11 内环）；axis_word_pack/unpack 8↔64 + 双向帧泵；`rtl/*_dly.v` = IDELAY 1250ps 修复版；排障脚本与 ILA 数据在 `scripts/` |
+| `project_9/` | 真光链路版（双笼 A↔B） | ✅ 真光链路判据全过（09-21，f7c8be8） | prj8 全部验证资产复用；loopback=3'b000 正常模式；判决位流 build9v/w（三域 ILA）；0.4% 丢失已定案修复（pack 队列 2→16，0ee2611），全量 10MB 100%+SHA |
+
+**🔄 正在推进**
+
+| 目录 | 工程 | 状态 |
+|---|---|---|
+| `project_4/` | MIG/DDR4（D 线第一步，09-26 #14 解冻） | 校准位流在库（`impl_1/mig_verify_top.bit`，WNS=+0.024/WHS=+0.004，ui_clk=300.12MHz，DDR4 4GiB），D1 校准复验待上板 |
+| `project_10/` | 内存进环路（DDR4 帧队列） | W2 仿真 PASS（09-29）→ W3 轨A 已执行（A1 端口 37 信号 / A2 延迟扫 / A3 尾拍 WSTRB 修复 / A4+A5 桥+真 MIG 时序收敛 WNS=+0.030，`prj_uiclk/`）；上板联调待场次 |
+
+**⏸️ 挂起（恢复触发条件见 vault `操作文档/挂起/README`）**：串口桥 M-D 三级验证（解 dbg 探针时钟域 undefined + AE33 输入方向）· `project_7/` SFP 前端内环（09-22 定案后不再复活，PCS/PMA 配置留档）· 8b/10b 练手（IBERT 已覆盖）· prj9 传输效率深挖 B 组（B1 板卡自发流/B2 C 发包器/B3 帧泵 B 硬件提速；E1–E5 已随实操单 v2 移回主线）。
+
+**🗄️ 归档/工具**：`project_2/` 8b/10b 练手遗骸 · `project_3/` Aurora IP 定版 xci · `0DMA_uart2ddr/`（MicroBlaze+MIG+DMA+UART 参考 BD，Vivado **2019.2**，**未验证勿当资产**，D2/D5 骨架）· `scripts/` 顶层 Tcl 骨架 · `KU_IO.xdc` + `docs/KU引脚表.xlsx`（GBK）· `docs/参考_cross_FMC_4SFP_GTH引脚表_2026-08-27.md`。
+
+### 附 B · docs/ 文档中心指向（原 README 迁入）
+
+- `docs/` = vault 文档的**脱敏快照**（用户名→***，人名→前辈；`[[双链]]` 按仓库惯例保留）；命名规范 `[阶段]_prj标识_概要_YYYY-MM-DD`，索引见 `docs/README.md`。
+- 关键文档：`导览_cross_已完成工作说明_2026-10-01.md`（8 件已完成工作展开）· `规划_cross_长期路线图_2026-09-04.md`（v4.5，#15 prj10 定案）· `追踪_cross_短期待办_2026-08-03.md` · `规划_cross_AI-Infra系统设计报告_2026-09-26.md`（v0.5）· `操作文档/`（含挂起区）· `调试记录/`（prj10 W2/W3 执行记录、prj9 R4 仿真复现等）· `结论_cross_prj9-prj10_进度体检报告_2026-09-29.md`。
+
+### 附 C · 标准开发流程（原 README 迁入）
+
+1. Vivado：设计 → 综合/实现 → Generate Bitstream → Export Hardware（含 bitstream）→ .xsa
+2. Hardware Manager：Program Device（成功标志 `End of startup status: HIGH`）
+3. Vitis：更新 .xsa → Run Configuration **取消 Program FPGA**（保留 Reset entire system）→ Run → 串口 9600
+4. 批处理构建：`vivado -mode batch -source <script>.tcl`（幂等脚本见各工程 `scripts\`；⚠️ 纯 ASCII 工作目录）
 
 ## 十一、跨目录约定
 
