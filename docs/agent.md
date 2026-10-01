@@ -62,6 +62,7 @@ cd D:\FPGA\prj\project_9; python scripts\udp_verify.py  # 回显一致 12/12
 - Python：`C:\Users\15266\AppData\Local\Python\pythoncore-3.14-64\python.exe`。
 - JTAG：Digilent USB-JTAG（210512180081）；串口 COM7。
 - 各工程脚本（create/build/program/board_test，幂等）在 `D:\FPGA\prj\project_N\scripts\`。
+- **配套工具 `vivado-mcp`（已随仓库入库）**：MCP 服务，**32 个工具**——会话/Tcl/工程/流程/报告/诊断/CDC/位流探针/IP/波形十类；其中 `parse_xpr`·`parse_bit_header`·`parse_ltx`·`xdc_lint` 为**离线工具**（不启 Vivado）。仓库内为**可移植副本**（`D:\FPGA\vivado-mcp\`，零本机配置），安装与清单见 `vivado-mcp/README.md`。⚠️ **与下条「工具纪律」里的本机 CLI 壳是两回事**：那层壳是开发者本地设施、不入库。两条硬约束：安装路径必须**纯 ASCII**（中文路径经 Vivado Tcl 的 ANSI 解码会乱码，会话必失败）；Vivado 会话与综合/实现/仿真**全局串行**。
 
 ## 当前状态（2026-10-01）
 

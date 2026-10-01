@@ -154,6 +154,25 @@ python scripts\udp_verify.py     # 判据：回显一致 12/12
 
 各工程 `scripts\` 下均有 `create_project / build / program` 幂等脚本，可在纯 ASCII 路径下一键重建工程。
 
+## 配套工具：vivado-mcp
+
+[\`vivado-mcp/\`](vivado-mcp/) 是本项目自研的 **MCP 服务**，把 Vivado 的常用操作封装成 **32 个工具**
+（读工程 / 查时序 / 审约束 / 看波形 / 跑综合实现 / 抓 ILA），供 AI 客户端直接调用，不必在 GUI 里逐步点。
+随仓库提供源码副本，**不含任何本机专有配置**，可在任意机器复现。
+
+\`\`\`powershell
+$env:PYTHONPATH = "D:\FPGA\vivado-mcp"
+python -m vivado_mcp doctor     # 只读诊断：能否找到 Vivado、依赖是否齐全
+python -m vivado_mcp install    # 可选：注入 Vivado_init.tcl，让 GUI 启动的 Vivado 也能被接管（自动备份）
+python -m vivado_mcp            # 启动 MCP server（stdio）
+\`\`\`
+
+其中 \`parse_xpr\` / \`parse_bit_header\` / \`parse_ltx\` / \`xdc_lint\` 属**离线工具**，不启动 Vivado 即可用。
+安装与工具清单详见 [\`vivado-mcp/README.md\`](vivado-mcp/README.md)。
+
+> ⚠️ **两条硬约束**：① 工具**安装路径必须纯 ASCII**（中文路径经 Vivado Tcl 的 ANSI 解码会乱码，会话必失败）；
+> ② Vivado 会话与综合/实现/仿真**全局串行**，同一时刻只让一个客户端占用。**烧板永远归人**。
+
 ## 仓库结构
 
 ```
@@ -164,6 +183,7 @@ prj/                    全部工程集中于此（2026-10-01 归类；本地路
   └─ 0DMA_uart2ddr/          MicroBlaze+DDR4+DMA 参考设计（未验证，仅作骨架）
 docs/                   文档中心：实操单、实施单、测试报告、调试记录（脱敏快照）
 docs/images/            本 README 引用的拓扑图
+vivado-mcp/             配套工具：让 AI 直接操作 Vivado 的 MCP 服务（见下节）
 AGENTS.md               工程规范：事实源优先级、硬件事实卡、CDC/ILA/XDC 约定、坑账本
 KU_IO.xdc               官方板卡引脚约束（事实基准）
 scripts/                顶层 Tcl 骨架（建工程 / 构建 / 烧录）
@@ -180,3 +200,7 @@ scripts/                顶层 Tcl 骨架（建工程 / 构建 / 烧录）
 ---
 
 *各工程详细验证过程与排障记录见 [`docs/`](docs/)；已完成工作的实现路径见 [补充说明](docs/导览_cross_已完成工作说明_2026-10-01.md)；工程状态以本文件与 git log 为准。*
+
+---
+
+**版权**：Copyright © 2026，**保留所有权利**（All rights reserved）。本仓库为毕业论文课题资料，未授予开源许可；如需引用或复用请联系作者。
