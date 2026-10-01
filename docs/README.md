@@ -30,6 +30,18 @@
 豁免：目录级索引 `README.md`、vault 会话入口 `agent.md`（`AGENTS.md` 的镜像摘要，冲突以 AGENTS.md 为准）与非 Markdown 数据文件（如 `KU引脚表.xlsx`）不受此规范约束。
 示例：`阶段二之八_prj8_数据级桥上板验证单_2026-09-10.md`。
 
+### 配图规范（`docs/images/`，2026-10-01 新增）
+
+仓库 README 需要**在 GitHub 上直接渲染**的配图统一放在 `docs/images/`：
+
+| 规则 | 说明 |
+|---|---|
+| **文件名用 ASCII** | 如 `ddr-route-a.png`、`topology-ai-infra.png`。中文文件名虽然 GitHub 能渲染，但 URL 会被百分号编码，复制/引用/工具链都容易出错；中文原名写在图注里 |
+| 引用方式 | 仓库根 README 用**相对路径**引用：`![图注](docs/images/xxx.png)`。Markdown 图片语法即可，无需 HTML |
+| 一图一义 | 图注（`![ ]` 里的文字）写清这张图回答什么问题；正文再说明图例（哪些颜色/形状代表什么） |
+
+现有配图：`topology-ai-infra.png`（AI-Infra 系统拓扑，README「系统定位」）· `aurora-udp-datapath.png`（project_8 数据环路，README「工程血缘」）· `ddr-route-a.png` / `ddr-route-b.png`（DDR 两条路线，README「内存进环路」）。
+
 ## 文件索引（本仓库文件 ↔ vault 曾用名）
 
 ### 根目录
