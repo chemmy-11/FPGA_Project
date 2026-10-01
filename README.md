@@ -156,19 +156,19 @@ python scripts\udp_verify.py     # 判据：回显一致 12/12
 
 ## 配套工具：vivado-mcp
 
-[\`vivado-mcp/\`](vivado-mcp/) 是本项目自研的 **MCP 服务**，把 Vivado 的常用操作封装成 **32 个工具**
+[`vivado-mcp/`](vivado-mcp/) 是本项目自研的 **MCP 服务**，把 Vivado 的常用操作封装成 **32 个工具**
 （读工程 / 查时序 / 审约束 / 看波形 / 跑综合实现 / 抓 ILA），供 AI 客户端直接调用，不必在 GUI 里逐步点。
 随仓库提供源码副本，**不含任何本机专有配置**，可在任意机器复现。
 
-\`\`\`powershell
+```powershell
 $env:PYTHONPATH = "D:\FPGA\vivado-mcp"
 python -m vivado_mcp doctor     # 只读诊断：能否找到 Vivado、依赖是否齐全
 python -m vivado_mcp install    # 可选：注入 Vivado_init.tcl，让 GUI 启动的 Vivado 也能被接管（自动备份）
 python -m vivado_mcp            # 启动 MCP server（stdio）
-\`\`\`
+```
 
-其中 \`parse_xpr\` / \`parse_bit_header\` / \`parse_ltx\` / \`xdc_lint\` 属**离线工具**，不启动 Vivado 即可用。
-安装与工具清单详见 [\`vivado-mcp/README.md\`](vivado-mcp/README.md)。
+其中 `parse_xpr` / `parse_bit_header` / `parse_ltx` / `xdc_lint` 属**离线工具**，不启动 Vivado 即可用。
+安装与工具清单详见 [`vivado-mcp/README.md`](vivado-mcp/README.md)。
 
 > ⚠️ **两条硬约束**：① 工具**安装路径必须纯 ASCII**（中文路径经 Vivado Tcl 的 ANSI 解码会乱码，会话必失败）；
 > ② Vivado 会话与综合/实现/仿真**全局串行**，同一时刻只让一个客户端占用。**烧板永远归人**。
