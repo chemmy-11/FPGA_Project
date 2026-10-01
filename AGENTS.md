@@ -137,6 +137,8 @@ D:\FPGA\project_N\
 | 16 | 文档被截断丢失（README 19 行/待办剩头 20 行）| AI 会话"部分读取(limit)后整体回写"= 截断事故——**写前必须全量读取并校验 totalLines 一致**；重要文档靠 git 历史 rescued（b8ae05c）；vault 无版本控制，重建需标注 |
 | 17 | `.ps1` 在 PS 5.1 下报一堆语法错（**不是代码坏了**）| 本机 shell = Windows PowerShell **5.1 Desktop**，`-File` 读**无 BOM** 的中文 `.ps1` 按 **ANSI(CP936)** 解码 → 中文串 UTF-8 字节把紧跟的单引号当双字节第二字节吞掉 → 字符串未闭合。实测：`verdict_capture.ps1` 前 3 字节 `35 32 61`(无 BOM) → `ParseFile` **6 真错误**；同目录 09-21 在用的 `storm_demo.ps1` = `239 187 191`(有 BOM) → **0**。⇒ **本仓库 `.ps1` 约定 = 带 UTF-8 BOM**。该文件因此**在 PS 5.1 下从未成功执行过**（连损坏前版本也不行）——排查时先验 BOM，别先怀疑逻辑 |
 | 18 | 改完 `.ps1` 后 BOM 又被剥掉 | **编辑工具/文本重写会静默剥掉 BOM**（2026-10-01 实证：5 处定点 edit 后前 3 字节从 `239 187 191` 变回 `35 32 61`，`ParseFile` 0 → 27 错）。⇒ **任何 `.ps1` 改动后必须复验前 3 字节 = 239 187 191**，且**解析判据要用 `[Parser]::ParseFile`（= `-File` 的真实读法）**，只用显式 UTF-8 的 `ParseInput` 会给出"逻辑 0 错误"的**假安全**（同一文件两种读法一个 0 一个 27）|
+| 19 | **XDC/Tcl 行尾 `#` 注释非法 → 那条约束根本没生效** | Tcl 里 **`#` 只在「命令行首」才是注释**；写在命令**行尾**的 `#` 会被当成**多余参数**传给命令 → `[Common 17-165] Too many positional options when parsing ...` **CRITICAL WARNING，命令失败**。prj9 实证：`xdc/aurora_udp_bridge.xdc:92` 的 `set_false_path ... # prj9: 通配符覆盖 _0 与 _1 双核` 未生效（该文件 40 处行首注释均合法，**行尾注释全文件仅此 1 处 ↔ 构建日志恰好 1 条 CRITICAL WARNING**，一一对应）。⇒ **XDC/脚本里注释一律独立成行**；排查「约束怎么没生效」先数 Too many positional options |
+| 20 | `xdc_lint` 对 GT 参考时钟报 `MISSING_IOSTANDARD`（**误报，别照改**） | `gt_refclk_p/n`（T6/T5 = MGTREFCLK1_X1Y2）是 **GT 专用引脚**，不需要也不应写 IOSTANDARD。事实源：官方 GT Wizard 例程 `gtwizard_ultrascale_0_example_top.xdc` L56-57 **同样只写 `package_pin`**（而同文件对 `sys_clk`/`sfp_rs` 等普通 IO 都写了 IOSTANDARD）；prj9 同写法综合日志 **0 条 NSTD-1/BIVC-1**。⇒ 见此类告警**先判端口是否为 GT 专用脚**，是则忽略 |
 
 ## 十、当前工程状态（一屏速览，详表见 README.md）
 
