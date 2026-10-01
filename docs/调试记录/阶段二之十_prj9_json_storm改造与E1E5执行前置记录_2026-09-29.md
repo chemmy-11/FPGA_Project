@@ -598,7 +598,7 @@ Select-String -Path $vc -Pattern 'chunk 1466'     # 期望两个分支都是 146
 
 # 7) 一键脚本退出码(判据卫生: .ps1 在同会话内用 & 调用**不会**设置 $LASTEXITCODE, 读到的是残留值;
 #    且本机执行策略禁止 in-process 运行未签名 .ps1 -> 必须用 -File)
-$p='C:\Users\15266\Desktop\毕设\操作文档\阶段二之十_prj9_E1E5执行_2026-09-29.ps1'
+$p='C:\Users\***\Desktop\毕设\操作文档\阶段二之十_prj9_E1E5执行_2026-09-29.ps1'
 (Start-Process powershell.exe -ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-File',$p,'-DryRun') -Wait -PassThru).ExitCode   # 期望 0
 
 # 8) 09-21 传输结论独立复核（逐字节比对）

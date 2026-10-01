@@ -116,7 +116,7 @@ set_property -dict {PACKAGE_PIN AE13 IOSTANDARD LVCMOS33} [get_ports {sfp_rs1[3]
 
 ## 3. 流程骨架（7 步）
 
-1. 新工程：`D:\FPGA\project_3`，名 **aurora_64b66b_loop**（part=`xcku060-ffva1156-2-i` 非 CIV）；之前 GT Wizard 误勾 X0Y3 的工程作废不管；
+1. 新工程：`D:\FPGA\prj\project_3`，名 **aurora_64b66b_loop**（part=`xcku060-ffva1156-2-i` 非 CIV）；之前 GT Wizard 误勾 X0Y3 的工程作废不管；
 2. IP Catalog → **Aurora 64B/66B** → 按 §1 逐项配置 → Generate（等 OOC 综合完）；
 3. 右键 IP → **Open IP Example Design**（选新目录）；
 4. 检查例程：framing exdes **自带 frame_gen/frame_check**（无需 prbs_any/stimulus 补丁，比 GT Wizard 省事）；记下 refclk / init_clk / 用户数据端口名；

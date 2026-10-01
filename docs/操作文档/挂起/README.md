@@ -39,10 +39,10 @@ related: "[[规划_cross_长期路线图_2026-09-04]] · [[追踪_cross_短期�
 
 | 产物 | 位置 | 状态 |
 |------|------|------|
-| 串口 ↔ Aurora 桥位流 | `D:\FPGA\aurora_64b66b_loop_ex\...\impl_1\aurora_64b66b_0_exdes.bit` | ⏸️ M-D 验证挂起 |
-| UDP + SFP 内环位流 | `D:\FPGA\project_7\prj\project_7.runs\impl_1\sfp_udp_inner_loop.bit` | ⏸️ C17 修复后待验证 |
+| 串口 ↔ Aurora 桥位流 | `D:\FPGA\prj\aurora_64b66b_loop_ex\...\impl_1\aurora_64b66b_0_exdes.bit` | ⏸️ M-D 验证挂起 |
+| UDP + SFP 内环位流 | `D:\FPGA\prj\project_7\prj\project_7.runs\impl_1\sfp_udp_inner_loop.bit` | ⏸️ C17 修复后待验证 |
 
-> MIG/DDR4 校准位流（`D:\FPGA\project_4`）已**随 D1 解冻**，不再列于挂起产物——它现在是主线第一步的待验对象。
+> MIG/DDR4 校准位流（`D:\FPGA\prj\project_4`）已**随 D1 解冻**，不再列于挂起产物——它现在是主线第一步的待验对象。
 
 ## 三、不在此列（避免误收）
 

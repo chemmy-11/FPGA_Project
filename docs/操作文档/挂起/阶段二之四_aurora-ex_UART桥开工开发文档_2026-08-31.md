@@ -22,7 +22,7 @@ PC 串口发数据 → 自写 UART/帧适配 → Aurora（内部 PMA 环回）�
 
 ## 2. 工程与设计分解
 
-- 工程：`D:\FPGA\project_5`（uart_aurora_bridge，part 非 CIV，全英文路径）
+- 工程：`D:\FPGA\prj\project_5`（uart_aurora_bridge，part 非 CIV，全英文路径）
 - 复用：Aurora IP 参数 = 阶段二之三定版（duplex/X1Y11/内部环回 3'b010/framing）——迁移方式见 U3
 - 新 RTL（约 400 行）：
 
