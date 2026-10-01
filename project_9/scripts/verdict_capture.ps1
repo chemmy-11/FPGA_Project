@@ -4,24 +4,41 @@
 # 用法: powershell -ExecutionPolicy Bypass -File scripts\verdict_capture.ps1 [full|quick]
 #   quick = 100KB 冒烟(验证判决机自身)   full = 10MB 全量(正式判决)  默认 full
 # 前提: 板子已上电且重烧判决位流(build9v), T23 常亮
+# 留档(2026-10-01): 每次快照的 ila_cntN.csv 自动归档到 scripts\ila_archive\<runId>\<stage>\,
+#   固定名文件照旧生成(供本脚本读取), 归档副本可提交为判据证据
 # =============================================================================
 param([string]$mode = 'full', [int]$PcLost = -1)
 $env:PYTHONUTF8 = '1'
 $py  = 'C:\Users\15266\AppData\Local\Python\pythoncore-3.14-64\python.exe'
 Set-Location D:\FPGA\project_9
+# ---- 配对留档(2026-10-01) -----------------------------------------------------
+# 为什么: ila_cap_cnt.tcl 用 write_hw_ila_data -force 写固定名 ila_cntN.csv, 每次快照覆盖
+#   前一次, 且 .gitignore:66 忽略它们 -> BEFORE/AFTER 配对在 09-21 已丢失, 六段对账
+#   至今不可独立重算(体检报告 §5.6 / json_storm 改造记录 §七-5)。留档后每次 E5 的
+#   配对产物落在 ila_archive\<runId>\{BEFORE,AFTER}\, 不被覆盖且 git 可追踪。
+$runId    = Get-Date -Format 'yyyyMMdd_HHmmss'
+$archRoot = 'scripts\ila_archive\' + $runId
 
-function SnapIlas {
+function SnapIlas([string]$stage) {
   & 'D:\Xilinx\Vivado\2023.1\bin\vivado.bat' -mode batch -source scripts\ila_cap_cnt.tcl -notrace *> $null
   $s = @{}
   foreach($f in @('ila_cnt0.csv','ila_cnt1.csv','ila_cnt2.csv')){ if(-not (Test-Path ('scripts\\' + $f))){ throw ('ILA 快照缺失: ' + $f + ' - 对应 ILA 抓取失败, 查 build_verdict.log / 板子状态') } }
   $c0 = (Import-Csv scripts\ila_cnt0.csv)[-1]; $c1 = (Import-Csv scripts\ila_cnt1.csv)[-1]; $c2 = (Import-Csv scripts\ila_cnt2.csv)[-1]
   foreach($c in @($c0,$c1,$c2)){ if($c){ foreach($p in $c.PSObject.Properties){ if($p.Name -match '^dbg_'){ $s[$p.Name] = [Convert]::ToInt32(($p.Value -replace '^0x',''),16) } } } }
+  # 配对留档: 本阶段三份 CSV 复制到 ila_archive\<runId>\<stage>\; 固定名原件供上面的 Import-Csv 用
+  $stageDir = Join-Path $archRoot $stage
+  New-Item -ItemType Directory -Force -Path $stageDir | Out-Null
+  foreach($f in @('ila_cnt0.csv','ila_cnt1.csv','ila_cnt2.csv')){ Copy-Item ('scripts\' + $f) -Destination $stageDir -Force }
+  $mf = @(('stage=' + $stage), ('mode=' + $mode), ('time=' + (Get-Date -Format s)), '')
+  foreach($k in ($s.Keys | Sort-Object)){ $mf += ($k + '=' + $s[$k]) }
+  Set-Content -Path (Join-Path $stageDir 'manifest.txt') -Value ($mf -join "`r`n") -Encoding UTF8
+  Write-Host ('   [留档] ' + $stageDir + ' (3 CSV + manifest.txt)')
   return $s
 }
 function Delta($a,$b,$key){ return ($b[$key] - $a[$key]) }
 
 Write-Host '==== [1/4] BEFORE 快照(三域 ILA) ====' -ForegroundColor Cyan
-$B = SnapIlas
+$B = SnapIlas 'BEFORE'
 if ($B.Count -lt 10) { Write-Host '!! 快照失败: 检查板子上电/重烧(program_board.tcl)' -ForegroundColor Red; exit 1 }
 Write-Host ('   pfwd_wr=' + $B['dbg_pfwd_wr[15:0]'] + ' echo_b_tx=' + $B['dbg_echo_b_tx[15:0]'] + ' prev_wr=' + $B['dbg_prev_wr[15:0]'])
 
@@ -40,7 +57,7 @@ if ($sum -match '"lost":\s*(\d+)')   { $PcLost = [int]$Matches[1] } else { Write
 Write-Host ('  PC 口径(自动读取): 发送片数=' + $pcSent + '  PC 丢失=' + $PcLost)
 
 Write-Host '==== [3/4] AFTER 快照 ====' -ForegroundColor Cyan
-$A = SnapIlas
+$A = SnapIlas 'AFTER'
 
 Write-Host '==== [4/4] 差分判决 ====' -ForegroundColor Cyan
 $d = @{

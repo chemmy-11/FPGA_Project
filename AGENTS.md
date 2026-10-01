@@ -74,7 +74,7 @@ D:\FPGA\project_N\
 3. `program_board.tcl`——hw_server 烧录（成功标记 `PROGRAM_OK`）。
 4. `board_test_*.ps1`——一键「烧录→ping→udp_verify」判据跑。
 
-**规范**：日志落文件再 Select-String（勿管道直取——回显行会污染）；`create_project -force` 前先杀残留 vivado 进程（锁 runs 目录是实坑）；python 一律 `PYTHONUTF8=1`。
+**规范**：日志落文件再 Select-String（勿管道直取——回显行会污染）；`create_project -force` 前先杀残留 vivado 进程（锁 runs 目录是实坑）；python 一律 `PYTHONUTF8=1`；**`.ps1` 一律带 UTF-8 BOM**（本机 shell 是 PS 5.1，读无 BOM 的中文脚本按 CP936 解码必报语法错——见坑账本 #17/#18）。
 
 ## 五、RTL/设计规范
 
@@ -135,6 +135,8 @@ D:\FPGA\project_N\
 | 14 | 位流断电即失 | JTAG 烧录易失——每次上电重烧（board_test 一键脚本兜底）|
 | 15 | 真光链路 25 帧后全灭 | 帧泵 wr_full 二进制/格雷混比，跨 2048 回绕永久伪满——标准 Cummings 格雷满 + 帧原子性 + 复位对称（f7c8be8）；板上必现→仿真复现→修复三连 |
 | 16 | 文档被截断丢失（README 19 行/待办剩头 20 行）| AI 会话"部分读取(limit)后整体回写"= 截断事故——**写前必须全量读取并校验 totalLines 一致**；重要文档靠 git 历史 rescued（b8ae05c）；vault 无版本控制，重建需标注 |
+| 17 | `.ps1` 在 PS 5.1 下报一堆语法错（**不是代码坏了**）| 本机 shell = Windows PowerShell **5.1 Desktop**，`-File` 读**无 BOM** 的中文 `.ps1` 按 **ANSI(CP936)** 解码 → 中文串 UTF-8 字节把紧跟的单引号当双字节第二字节吞掉 → 字符串未闭合。实测：`verdict_capture.ps1` 前 3 字节 `35 32 61`(无 BOM) → `ParseFile` **6 真错误**；同目录 09-21 在用的 `storm_demo.ps1` = `239 187 191`(有 BOM) → **0**。⇒ **本仓库 `.ps1` 约定 = 带 UTF-8 BOM**。该文件因此**在 PS 5.1 下从未成功执行过**（连损坏前版本也不行）——排查时先验 BOM，别先怀疑逻辑 |
+| 18 | 改完 `.ps1` 后 BOM 又被剥掉 | **编辑工具/文本重写会静默剥掉 BOM**（2026-10-01 实证：5 处定点 edit 后前 3 字节从 `239 187 191` 变回 `35 32 61`，`ParseFile` 0 → 27 错）。⇒ **任何 `.ps1` 改动后必须复验前 3 字节 = 239 187 191**，且**解析判据要用 `[Parser]::ParseFile`（= `-File` 的真实读法）**，只用显式 UTF-8 的 `ParseInput` 会给出"逻辑 0 错误"的**假安全**（同一文件两种读法一个 0 一个 27）|
 
 ## 十、当前工程状态（一屏速览，详表见 README.md）
 
