@@ -1,4 +1,4 @@
-# board_test_rxfix.ps1 - 烧录 RX 修复版位流并跑全套判据（2026-09-17）
+﻿# board_test_rxfix.ps1 - 烧录 RX 修复版位流并跑全套判据（2026-09-17）
 Set-Location D:\FPGA\prj\project_8
 & 'D:\Xilinx\Vivado\2023.1\bin\vivado.bat' -mode batch -source scripts\program_board.tcl -notrace |
     Select-String -Pattern 'PROGRAM_OK|DEVICE|ERROR'

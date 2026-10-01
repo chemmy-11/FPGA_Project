@@ -1,4 +1,4 @@
-# traffic.ps1 - 从随机源端口向板卡 192.168.1.10:1234 发 UDP，回包会落到 PC:1234
+﻿# traffic.ps1 - 从随机源端口向板卡 192.168.1.10:1234 发 UDP，回包会落到 PC:1234
 $ErrorActionPreference = 'Continue'
 $dst = '192.168.1.10'
 $port = 1234

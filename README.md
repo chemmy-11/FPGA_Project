@@ -1,11 +1,13 @@
 # FPGA_Project — FPGA 高速互联网络平台
 
-![FPGA](https://img.shields.io/badge/FPGA-Kintex_UltraScale_XCKU060-0b7285?style=flat-square)
-![板间干线](https://img.shields.io/badge/%E6%9D%BF%E9%97%B4%E5%B9%B2%E7%BA%BF-Aurora_64b%2F66b_%C2%B7_10G-7048e8?style=flat-square)
-![端点接入](https://img.shields.io/badge/%E7%AB%AF%E7%82%B9%E6%8E%A5%E5%85%A5-%E5%8D%83%E5%85%86%E4%BB%A5%E5%A4%AA%E7%BD%91_%C2%B7_UDP-0c8599?style=flat-square)
-![工具链](https://img.shields.io/badge/%E5%B7%A5%E5%85%B7%E9%93%BE-Vivado_2023.1-e8590c?style=flat-square)
-![状态](https://img.shields.io/badge/%E7%8A%B6%E6%80%81-%E5%8D%95%E6%9D%BF%E9%97%AD%E7%8E%AF%E5%B7%B2%E5%AE%8C%E6%88%90-2f9e44?style=flat-square)
-![许可](https://img.shields.io/badge/%E8%AE%B8%E5%8F%AF-%E4%BF%9D%E7%95%99%E6%89%80%E6%9C%89%E6%9D%83%E5%88%A9-c92a2a?style=flat-square)
+[![CI](https://github.com/chemmy-11/FPGA_Project/actions/workflows/ci.yml/badge.svg)](https://github.com/chemmy-11/FPGA_Project/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square)](LICENSE)
+[![Last Commit](https://img.shields.io/github/last-commit/chemmy-11/FPGA_Project/master?style=flat-square)](https://github.com/chemmy-11/FPGA_Project/commits/master)
+[![Vivado](https://img.shields.io/badge/Vivado-2023.1-e8590c?style=flat-square)](docs/README.md)
+[![FPGA](https://img.shields.io/badge/FPGA-Kintex_UltraScale_XCKU060-0b7285?style=flat-square)](AGENTS.md)
+[![板间干线](https://img.shields.io/badge/%E6%9D%BF%E9%97%B4%E5%B9%B2%E7%BA%BF-Aurora_64b%2F66b_%C2%B7_10G-7048e8?style=flat-square)](prj/project_9)
+[![端点接入](https://img.shields.io/badge/%E7%AB%AF%E7%82%B9%E6%8E%A5%E5%85%A5-%E5%8D%83%E5%85%86%E4%BB%A5%E5%A4%AA%E7%BD%91_%C2%B7_UDP-0c8599?style=flat-square)](prj/project_6)
+[![文档](https://img.shields.io/badge/%E6%96%87%E6%A1%A3-docs%2F-495057?style=flat-square)](docs/README.md)
 
 基于正点原子 KU060 开发板（Kintex UltraScale `xcku060-ffva1156-2-i`）搭建的多节点数据交换平台：
 
@@ -194,9 +196,26 @@ docs/                   文档中心：实操单、实施单、测试报告、�
 docs/images/            本 README 引用的拓扑图
 vivado-mcp/             配套工具：让 AI 直接操作 Vivado 的 MCP 服务（见下节）
 AGENTS.md               工程规范：事实源优先级、硬件事实卡、CDC/ILA/XDC 约定、坑账本
+LICENSE                 Apache-2.0（覆盖作者原创部分）
+THIRD_PARTY.md          第三方组件与素材声明（含 AMD/Xilinx 版权素材，不适用 Apache-2.0）
 KU_IO.xdc               官方板卡引脚约束（事实基准）
-scripts/                顶层 Tcl 骨架（建工程 / 构建 / 烧录）
+scripts/                顶层 Tcl 骨架（建工程 / 构建 / 烧录）+ ci_check.py（仓库体检）
+.github/workflows/      CI：文档规范 / 相对链接 / 脚本语法自动检查
 ```
+
+## 持续集成（CI）
+
+每次 push / PR 自动跑一轮**仓库体检**（[`.github/workflows/ci.yml`](.github/workflows/ci.yml) → [`scripts/ci_check.py`](scripts/ci_check.py)），**不依赖 Vivado**，秒级完成：
+
+| 检查项 | 判据 |
+|---|---|
+| **文档命名规范** | `docs/` 下 Markdown 须为 `[阶段]_prj标识_概要_YYYY-MM-DD.md`（禁空格；`README.md`/`agent.md` 豁免；工程内部 docs/ 不受约束） |
+| **相对链接可解析** | 全仓库 Markdown 的相对链接与图片必须指向真实存在的文件（防断链） |
+| **Python 语法** | 仓库内全部 `.py` 可编译 |
+| **`.ps1` 编码** | 含非 ASCII 的 PowerShell 脚本必须带 UTF-8 BOM（PS 5.1 老坑，见 AGENTS.md 坑账本 #17/#18） |
+| **Tcl 语法完整性** | 全部 `.tcl` 引号/括号闭合（`info complete`） |
+
+本地也可随时跑：`python scripts/ci_check.py`（退出码 0 = 全过）。
 
 ## 开发约定
 
@@ -212,5 +231,8 @@ scripts/                顶层 Tcl 骨架（建工程 / 构建 / 烧录）
 
 ---
 
-**版权**：本仓库自有内容 Copyright © 2026，**保留所有权利**（All rights reserved）——为毕业论文课题资料，未授予开源许可，如需引用或复用请联系作者。
-**例外**：[`vivado-mcp/`](vivado-mcp/) 为第三方开源项目的源码副本，遵循其上游 **Apache License 2.0**（全文见 [`vivado-mcp/LICENSE`](vivado-mcp/LICENSE)），不受上述声明约束。
+**许可**：本仓库**作者原创部分**（自研 RTL、脚本、文档、评测与工具链封装）采用 **[Apache License 2.0](LICENSE)**。
+**例外**（详见 [`THIRD_PARTY.md`](THIRD_PARTY.md)，该文件同时充当 Apache-2.0 所指的 NOTICE）：
+- **AMD / Xilinx 版权素材**——`prj/aurora_64b66b_loop_ex/`、`prj/ibert_ultrascale_gth_0/`、各工程的官方例程移植件与 IP 生成物、`KU_IO.xdc` 等：**不适用** Apache-2.0，权利归 AMD/Xilinx，仅供学习研究；
+- [`vivado-mcp/`](vivado-mcp/)——第三方项目，遵循其上游 Apache-2.0（全文见 [`vivado-mcp/LICENSE`](vivado-mcp/LICENSE)）；
+- `prj/0DMA_uart2ddr/`——来源未考证的参考设计，**不主张权利、不授予许可**。

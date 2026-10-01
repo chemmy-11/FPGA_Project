@@ -1,4 +1,4 @@
-#=============================================================================
+﻿#=============================================================================
 # run_sim.ps1 -- prj10 W2: compile + elaborate + run the memory-bridge sim
 # Uses ONLY xvlog/xelab/xsim (no Vivado project is created: the draft's red line
 # "本单批准前不建工程" is respected literally -- simulation work package only).

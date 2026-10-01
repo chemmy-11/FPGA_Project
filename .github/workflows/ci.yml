@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  repo-check:
+    name: 仓库体检（文档规范 / 链接 / 脚本语法）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 安装 tclsh（用于 Tcl 语法完整性检查）
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq tcl
+
+      - name: 运行仓库体检
+        run: python scripts/ci_check.py
