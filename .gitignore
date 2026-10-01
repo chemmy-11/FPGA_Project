@@ -19,7 +19,7 @@
 *.xsa
 *.bak
 *.dcp
-project_1/project_1.srcs/utils_1/
+prj/project_1/project_1.srcs/utils_1/
 
 # ===== 废弃测试工程（勿入仓库）=====
 /test/
@@ -45,10 +45,11 @@ Thumbs.db
 .reasonix/
 
 # ===== 用户实验文件（未接入工程；注释声称的 DONE 修复无效，根因=part 选错）=====
-project_1/pins.xdc
+prj/project_1/pins.xdc
 
-# ===== Vivado 工程目录 prj/（可由 scripts/*.tcl 幂等重建）=====
-prj/
+# ===== 工程目录统一收纳在顶层 prj/（2026-10-01 归类），其中各工程的 Vivado 工程目录仍不提交 =====
+# 只忽略嵌套层：prj/<工程>/prj/（可由 scripts/*.tcl 幂等重建）；顶层 prj/ 本身要入库
+/prj/*/prj/
 xsim.dir/
 xvlog.pb
 xvlog.log
@@ -62,13 +63,13 @@ xelab.pb
 *.rpt
 
 # ===== prj9 运行产物（ILA 捕获 CSV / python 缓存 / 测试数据与日志，可再生）=====
-project_9/scripts/__pycache__/
-project_9/scripts/ila_*.csv
-project_9/iter_*.txt
-project_9/testdata/
+prj/project_9/scripts/__pycache__/
+prj/project_9/scripts/ila_*.csv
+prj/project_9/iter_*.txt
+prj/project_9/testdata/
 
 # ===== MCP 桥的 Vivado 会话锁（瞬时文件，勿入库）=====
 .mcp-pilot-vivado.lock
 
 # ===== prj10 W3 前置工程（生成的 Vivado 工程目录，可由 scripts/*.tcl 幂等重建）=====
-project_10/prj_uiclk/vivado/
+prj/project_10/prj_uiclk/vivado/

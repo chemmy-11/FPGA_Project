@@ -48,10 +48,10 @@
 
 ```powershell
 # 位流断电即失 → 一键重烧+判据：
-powershell -File D:\FPGA\project_9\scripts\board_test_*.ps1
+powershell -File D:\FPGA\prj\project_9\scripts\board_test_*.ps1
 ping 192.168.1.10 -n 20                          # 0% 丢包、全 <1ms
 $env:PYTHONUTF8 = 1                              # 必须（GBK 控制台崩溃）
-cd D:\FPGA\project_9; python scripts\udp_verify.py  # 回显一致 12/12
+cd D:\FPGA\prj\project_9; python scripts\udp_verify.py  # 回显一致 12/12
 ```
 
 佐证：Wireshark 过滤 `udp.port==1234`，请求/回显成对且 payload 相同。三层证明力：T23=链路、ping=通路、udp_verify=数据完整性。
@@ -61,7 +61,7 @@ cd D:\FPGA\project_9; python scripts\udp_verify.py  # 回显一致 12/12
 - Vivado 2023.1：`D:\Xilinx\Vivado\2023.1\bin\vivado.bat`；批处理 `-mode batch -source <tcl>`，日志落文件再检索。
 - Python：`C:\Users\15266\AppData\Local\Python\pythoncore-3.14-64\python.exe`。
 - JTAG：Digilent USB-JTAG（210512180081）；串口 COM7。
-- 各工程脚本（create/build/program/board_test，幂等）在 `D:\FPGA\project_N\scripts\`。
+- 各工程脚本（create/build/program/board_test，幂等）在 `D:\FPGA\prj\project_N\scripts\`。
 
 ## 当前状态（2026-10-01）
 
@@ -70,14 +70,14 @@ cd D:\FPGA\project_9; python scripts\udp_verify.py  # 回显一致 12/12
 - **0.4% 丢失已定案修复**（pack 队列 2→16 深，判决位流差分链算术闭合），全量 10MB **100%+SHA 一致**；真实业务传输层 `json_reliable.py` 验证通过（交付 100%/0 重传）。三域 ILA 判决位流 build9v/w（git d9327bd/0ee2611）。
 - **规划基线变更（09-22）**：**开题报告 v2**《面向边缘多节点协作的 FPGA 高速互联网络平台设计与实现》生效，替代原《面向边缘联邦学习…》；配套 `AI-Infra系统设计/FPGA-AI-Infra-系统设计报告`。三项定案：端点一律**千兆网口**接入（prj7 SFP 承载以太网不再需要）· 板间 = 同 Quad **双 Aurora 核的双 10G 平行链路**（A=X1Y11 / B=X1Y9）· 队列后端原定 **BRAM 多帧优先、DDR4 条件触发**（#13）。
 - **路线更新（09-26）**：导师定案 **DDR 先行**（#14，修订 #13 分步）——D 线 D1 MIG 校准复验 → D2 队列后端 DDR 化 → D3 判别复测 → D4 缓存/直通双模式 → D5 AXI DMA；BRAM 降为回退。设计报告升 **v0.5**。
-- **prj10 W2 内存桥 RTL + 仿真已执行（09-29）**：新目录 D:\FPGA\project_10\ ——三层 RTL（async_fifo / axi4_master_bridge / frame_mem_if）+ AXI4 RAM 替身 + 六用例 TB，**PASS (0 errors)**，一键复现 sim\run_sim.bat；**未建 Vivado 工程 / 未上板 / prj4·prj9 零改动**。详见 [[调试记录/阶段三_prj10_内存桥RTL与仿真记录_2026-09-29]]。
+- **prj10 W2 内存桥 RTL + 仿真已执行（09-29）**：新目录 D:\FPGA\prj\project_10\ ——三层 RTL（async_fifo / axi4_master_bridge / frame_mem_if）+ AXI4 RAM 替身 + 六用例 TB，**PASS (0 errors)**，一键复现 sim\run_sim.bat；**未建 Vivado 工程 / 未上板 / prj4·prj9 零改动**。详见 [[调试记录/阶段三_prj10_内存桥RTL与仿真记录_2026-09-29]]。
 - **prj10 二次核查（09-29 深夜 · Agent Team 并行）**——三条结论改变 W3 起点：
   (a) **PASS 的适用边界**：替身模型立即应答、地址静默取低 20 位 → 只覆盖数据面功能，**不覆盖 AXI4 端口合规性与真 MIG 延迟维度**；
   (b) **设计点数字改写**：单桥 1466 B = **5.14 µs（替身）/ 5.80 µs（Lw=200）**，**两级桥串行 = 10.2–11.7 µs**（裕量仅 **1.05–1.20×**）——记录里"3.11 µs/帧、+6 µs"是混合帧长均值口径，**不可作设计点引用**；DDR 带宽只用 **1.2%**，**约束是端口并发与延迟，不是带宽**；
   (c) **W3 前置硬阻断**：桥**缺 12 个 AXI4 端口**（awid/bid/arid/rid + lock/cache/prot/qos）→ **按当前端口清单无法与 prj4 的 `ddr4_0` 直接例化**（约 12 行 wrapper 可补）；另发现 **2 个真缺陷**（`out_inc/out_dec` 多驱动、超长帧写 FSM 永久卡 `W_DRAIN`），均已带最小复现并授权修。
-- **MIG/D1 断点核查完成（09-29 深夜）**：prj4 **综合+实现+位流+ILA 探针全部在库**（`runs/impl_1/mig_verify_top.bit` 24.1 MB / `mig_verify_top.ltx`，2026-09-01，Version=2023.1）；fully routed 45206/45206、DRC 0 Error、**WNS=+0.024 / WHS=+0.004 ns（零余量）**；**ui_clk=300.12 MHz**（三链一致）、**DDR4=4 GiB**（`Capacity=512` 是器件深度代号，不是容量）；**引脚 112/112 与布线结果全量一致**。→ **D1 = 烧现有位流复验（分钟级），不需要建工程**；唯一未知量是"校准从未上板"。另：例程自带 `mig_verify_top.v` 的 256 拍突发跨 4KB 边界 3 次（AXI4 违规）——**D1 若失败，第一处置动作是把 awlen/arlen 降到 ≤63 重出位流**。详见 `D:\FPGA\project_4\D1_MIG断点核查_2026-09-29.md`。
-- **新发现参考实现 `D:\FPGA\0DMA_uart2ddr\`**：MicroBlaze + DDR4(MIG) + AXI DMA + UART 完整 BD，**已出位流**（`design_1_wrapper.bit`，2026-06-01，**Vivado 2019.2**）→ D2/D5 的现成骨架；**是否真上板跑通未核实，不得写成已验证**；亦不在 AGENTS.md 工程清单内，属"存在但未登记"。
-- **R4 过载冻结机制 · 离线仿真证实（2026-10-01，板不在手期间推进）**：新建 TB `D:\FPGA\project_9\sim\r4_start_lost\`（只读 udp_tx，**prj9 rtl/xdc/prj 零改动**，未动 project_10）。四步激励逐字节证明：忙态到达的 `rec_pkt_done` 单拍脉冲**被整帧丢弃**（`nframes` 不增）→ 该帧字节留存无帧边界 FIFO（残留 50B）→ 下一个 start **用新长度读旧字节**（实得 `d0..`，期望 `e0..`）→ **终态永久偏移 50B**。一键复现 `run_sim.ps1`（带 BOM，退出码 0/2/1 + 自动判决）。**修复方向已设计未施行**（案 A 忙时锁存 pending ~10 行 / 案 B 帧边界队列 = D2 语义）——不改 RTL 因 E1–E5 用现有判决位流、且 prj10 W3 场次3 沿用 prj9 rtl。**E2 判读升级为三分归因**（板端丢帧 > 泵A+泵B 计数之和 ⇒ 差额即栈 TX 侧）；**E3 判据不受影响**（12.5 µs > 忙窗 ⇒ start 恒落 idle）。详见 [[调试记录/阶段二之十_prj9_过载冻结R4机制仿真复现_2026-10-01]]
+- **MIG/D1 断点核查完成（09-29 深夜）**：prj4 **综合+实现+位流+ILA 探针全部在库**（`runs/impl_1/mig_verify_top.bit` 24.1 MB / `mig_verify_top.ltx`，2026-09-01，Version=2023.1）；fully routed 45206/45206、DRC 0 Error、**WNS=+0.024 / WHS=+0.004 ns（零余量）**；**ui_clk=300.12 MHz**（三链一致）、**DDR4=4 GiB**（`Capacity=512` 是器件深度代号，不是容量）；**引脚 112/112 与布线结果全量一致**。→ **D1 = 烧现有位流复验（分钟级），不需要建工程**；唯一未知量是"校准从未上板"。另：例程自带 `mig_verify_top.v` 的 256 拍突发跨 4KB 边界 3 次（AXI4 违规）——**D1 若失败，第一处置动作是把 awlen/arlen 降到 ≤63 重出位流**。详见 `D:\FPGA\prj\project_4\D1_MIG断点核查_2026-09-29.md`。
+- **新发现参考实现 `D:\FPGA\prj\0DMA_uart2ddr\`**：MicroBlaze + DDR4(MIG) + AXI DMA + UART 完整 BD，**已出位流**（`design_1_wrapper.bit`，2026-06-01，**Vivado 2019.2**）→ D2/D5 的现成骨架；**是否真上板跑通未核实，不得写成已验证**；亦不在 AGENTS.md 工程清单内，属"存在但未登记"。
+- **R4 过载冻结机制 · 离线仿真证实（2026-10-01，板不在手期间推进）**：新建 TB `D:\FPGA\prj\project_9\sim\r4_start_lost\`（只读 udp_tx，**prj9 rtl/xdc/prj 零改动**，未动 project_10）。四步激励逐字节证明：忙态到达的 `rec_pkt_done` 单拍脉冲**被整帧丢弃**（`nframes` 不增）→ 该帧字节留存无帧边界 FIFO（残留 50B）→ 下一个 start **用新长度读旧字节**（实得 `d0..`，期望 `e0..`）→ **终态永久偏移 50B**。一键复现 `run_sim.ps1`（带 BOM，退出码 0/2/1 + 自动判决）。**修复方向已设计未施行**（案 A 忙时锁存 pending ~10 行 / 案 B 帧边界队列 = D2 语义）——不改 RTL 因 E1–E5 用现有判决位流、且 prj10 W3 场次3 沿用 prj9 rtl。**E2 判读升级为三分归因**（板端丢帧 > 泵A+泵B 计数之和 ⇒ 差额即栈 TX 侧）；**E3 判据不受影响**（12.5 µs > 忙窗 ⇒ start 恒落 idle）。详见 [[调试记录/阶段二之十_prj9_过载冻结R4机制仿真复现_2026-10-01]]
 - **E5 配对留档 + AGENTS.md 补 BOM 纪律（2026-10-01，工程提交 eb23b94）**：`verdict_capture.ps1` 每次快照自动归档到 `scripts\ila_archive\<runId>\{BEFORE,AFTER}\`（3 CSV + manifest.txt），根治 09-21「固定名 `-force` 覆盖 ⇒ 配对丢失 ⇒ 六段对账不可重算」；AGENTS.md 坑账本补 **#17**（PS 5.1 读无 BOM 中文 `.ps1` 必报语法错，非代码坏）与 **#18**（编辑会静默剥 BOM ⇒ 改完必须复验前 3 字节；解析判据用 `ParseFile` 而非 `ParseInput`）
 - **工具纪律（修订 2026-10-01）**：Vivado MCP（`vivado-mcp` 0.3.26）**已复检可用**，脚本桥 **已迁到纯 ASCII 路径 `D:\vivado-mcp\mcp_ctl.py`**（`毕设\.mcp-pilot\mcp_ctl.py` 保留为转发壳，旧引用不失效）。离线工具：parse_xpr/parse_bit_header/parse_ltx/xdc_lint（全过）；Vivado 会话与综合/实现/仿真**全局串行**，锁文件 `D:\FPGA\.mcp-pilot-vivado.lock`；烧板永远归用户。
   **迁移根因 = 坑账本 #21**：中文安装路径经 Vivado Tcl 的 ANSI(GBK) 解码变成「姣曡??」→ `start_session` 必失败。**三条实测约束**：① 安装路径必须纯 ASCII；② `mcp_ctl.py` 是 CLI 壳，**每个子命令一个新 MCP 进程**，会话不跨进程 → 会话类操作必须在**同一次调用/同一进程**内完成（多步请直接写单进程脚本，参照 `D:\vivado-mcp\tmp\recheck.py`）；③ `compare_xci` 只吃 **XML 版 .xci**，Vivado 2020.1+ 的 **JSON 版 .xci 必报 `XML 解析失败`**（本机 2023.1 全部 .xci 都是 JSON → 该工具不可用）。

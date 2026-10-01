@@ -1,0 +1,31 @@
+
+****** xsim v2023.1 (64-bit)
+  **** SW Build 3865809 on Sun May  7 15:05:29 MDT 2023
+  **** IP Build 3864474 on Sun May  7 20:36:21 MDT 2023
+  **** SharedData Build 3865790 on Sun May 07 13:33:03 MDT 2023
+    ** Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.
+    ** Copyright 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+
+source xsim.dir/r4sim/xsim_script.tcl
+# xsim {r4sim} -autoloadwcfg -runall
+Time resolution is 1 ps
+run -all
+==== R4 忙态 start 丢失复现 (prj9 udp_tx) ====
+[step1] A(100B,A0) 发出后 nframes=1  wr=100 rd=100
+    frame[0] len=154  payload[0..5]=a0 a1 a2 a3 a4 a5
+        头部转储[44..53]= 04 d2 00 6c 00 00 a0 a1 a2 a3  <- 载荷首字节(a0)应落在 50
+[step2] B(100B,B0) 发出后 nframes=2  wr=200 rd=200
+    frame[1] len=154  payload[0..5]=b0 b1 b2 b3 b4 b5
+[step3] 忙态注入: gmii_tx_en=1 (1=确在忙)  -> 投 D(50B,D0) 并脉冲 start
+[step3] 忙态 start 之后  nframes=3  (若=3 则 D 的 start 被丢弃)
+[step3] FIFO: wr=450 rd=400  残留=50 B (D 的 50B 未消费)
+    frame[2] len=254  payload[0..5]=c0 c1 c2 c3 c4 c5
+[step4] E(30B,E0) 发出后 nframes=4  wr=480 rd=430
+    frame[3] len=84  payload[0..5]=d0 d1 d2 d3 d4 d5
+        期望(正确设计)=e0..  实得(错误)=d0 d1 d2
+>> 判决: 字节流错位【成立】—— 新帧(E0/len=30)发出了旧帧(D0)的字节
+[终态] nframes=4  wr=480 rd=430  未消费=50 B
+==== R4 TB 结束 ====
+$finish called at time : 96676 ns : File "D:/FPGA/prj/project_9/sim/r4_start_lost/r4_tx_start_tb.sv" Line 159
+exit
+INFO: [Common 17-206] Exiting xsim at Thu Oct  1 20:07:38 2026...

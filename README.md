@@ -81,7 +81,7 @@
 
 **图例**：✅ 已上板验证闭环 · ⏸ 封存（保留入库，不再推进）· 🔄 进行中
 
-图外挂起支线：project_2（8b/10b 编解码练手，仅起步即跳过——物理层信号质量已由 IBERT 眼图实验覆盖，2026-08-27）；串口调试桥（在 `aurora_64b66b_loop_ex/` 例程目录内，上位机验证资料未收到）。
+图外挂起支线：project_2（8b/10b 编解码练手，仅起步即跳过——物理层信号质量已由 IBERT 眼图实验覆盖，2026-08-27）；串口调试桥（在 `prj/aurora_64b66b_loop_ex/` 例程目录内，上位机验证资料未收到）。
 
 ### 数据环路长什么样（project_8 为例）
 
@@ -95,18 +95,18 @@
 
 | 目录 | 内容 | 验证判据（怎么算"过"） | 状态 |
 |---|---|---|---|
-| `project_1/` | MicroBlaze 软核最小系统 | 串口打印 Hello World | ✅ 2026-08-11 |
-| `project_3/` | Aurora 64b/66b IP 配置定版 | GT 内环 channel_up、零误码 | ✅ 2026-08-31 |
-| `project_4/` | MIG DDR4 读写校准 | 校准完成 + 读写数据比对零误码；位流已产出 | 🔄 校准复验待上板 |
-| `project_6/` | 千兆以太网 UDP 协议栈 | ping 0% 丢包、UDP 回显逐字节一致、Wireshark 抓包核对 | ✅ 2026-09-04 |
-| `project_8/` | Aurora-UDP 桥接 | PC 发 UDP → 穿 Aurora 编解码往返 → payload 逐字节一致 | ✅ 2026-09-18 |
-| `project_9/` | 真实光纤链路全链路 | 光口 A↔B 对接，10MB 文件 100% 到达 + SHA256 一致 | ✅ 2026-09-21 |
-| `project_10/` | DDR4 帧队列（内存进环路） | 仿真六用例全过；真 MIG 综合时序收敛；上板联调待做 | 🔄 开发中 |
-| `project_2/` | 8b/10b 编解码练手（仅起步即跳过，物理层由 IBERT 实验覆盖） | — | ⏸ 封存 |
-| `project_7/` | SFP 光口以太网前端 | — | ⏸ 封存 |
-| `aurora_64b66b_loop_ex/` | Aurora 官方例程 + 串口调试桥 | 例程内环已验证；串口桥验证未完成 | ⏸ 留档 |
-| `ibert_ultrascale_gth_0/` | IBERT 物理层实验 | 10G PRBS 过纤零误码 + 眼图 | ✅ 2026-08-27 |
-| `0DMA_uart2ddr/` | MicroBlaze+MIG+DMA+UART 参考设计（Vivado 2019.2） | **未验证**，仅作参考骨架 | 🗄️ 归档 |
+| `prj/project_1/` | MicroBlaze 软核最小系统 | 串口打印 Hello World | ✅ 2026-08-11 |
+| `prj/project_3/` | Aurora 64b/66b IP 配置定版 | GT 内环 channel_up、零误码 | ✅ 2026-08-31 |
+| `prj/project_4/` | MIG DDR4 读写校准 | 校准完成 + 读写数据比对零误码；位流已产出 | 🔄 校准复验待上板 |
+| `prj/project_6/` | 千兆以太网 UDP 协议栈 | ping 0% 丢包、UDP 回显逐字节一致、Wireshark 抓包核对 | ✅ 2026-09-04 |
+| `prj/project_8/` | Aurora-UDP 桥接 | PC 发 UDP → 穿 Aurora 编解码往返 → payload 逐字节一致 | ✅ 2026-09-18 |
+| `prj/project_9/` | 真实光纤链路全链路 | 光口 A↔B 对接，10MB 文件 100% 到达 + SHA256 一致 | ✅ 2026-09-21 |
+| `prj/project_10/` | DDR4 帧队列（内存进环路） | 仿真六用例全过；真 MIG 综合时序收敛；上板联调待做 | 🔄 开发中 |
+| `prj/project_2/` | 8b/10b 编解码练手（仅起步即跳过，物理层由 IBERT 实验覆盖） | — | ⏸ 封存 |
+| `prj/project_7/` | SFP 光口以太网前端 | — | ⏸ 封存 |
+| `prj/aurora_64b66b_loop_ex/` | Aurora 官方例程 + 串口调试桥 | 例程内环已验证；串口桥验证未完成 | ⏸ 留档 |
+| `prj/ibert_ultrascale_gth_0/` | IBERT 物理层实验 | 10G PRBS 过纤零误码 + 眼图 | ✅ 2026-08-27 |
+| `prj/0DMA_uart2ddr/` | MicroBlaze+MIG+DMA+UART 参考设计（Vivado 2019.2） | **未验证**，仅作参考骨架 | 🗄️ 归档 |
 
 **状态图例**：✅ 已上板验证闭环 · 🔄 进行中 · ⏸ 封存（保留入库，不再推进）· 🗄️ 归档（仅作参考）
 
@@ -137,7 +137,7 @@
 
 ```powershell
 # 1) 烧录位流（断电后位流易失，需重烧；脚本幂等）
-& 'D:\Xilinx\Vivado\2023.1\bin\vivado.bat' -mode batch -source D:\FPGA\project_9\scripts\program_board.tcl
+& 'D:\Xilinx\Vivado\2023.1\bin\vivado.bat' -mode batch -source D:\FPGA\prj\project_9\scripts\program_board.tcl
 
 # 2) 链路层：板上 T23 LED 常亮 = Aurora 双通道链路建立（channel_up 硬门控）
 
@@ -146,7 +146,7 @@ ping 192.168.1.10 -n 20          # 判据：0% 丢包、全部 <1ms
 
 # 4) 数据层：UDP 回显校验（先关掉占用 1234 端口的程序）
 $env:PYTHONUTF8 = 1              # Windows 控制台必设，否则中文输出崩
-cd D:\FPGA\project_9
+cd D:\FPGA\prj\project_9
 python scripts\udp_verify.py     # 判据：回显一致 12/12
 ```
 
@@ -157,10 +157,11 @@ python scripts\udp_verify.py     # 判据：回显一致 12/12
 ## 仓库结构
 
 ```
-project_N/              各 Vivado 工程（rtl / sim / scripts / xdc / docs）
-ibert_ultrascale_gth_0/ IBERT 眼图实验工程
-aurora_64b66b_loop_ex/  Aurora 官方例程留档（内含串口调试桥）
-0DMA_uart2ddr/          MicroBlaze+DDR4+DMA 参考设计（未验证，仅作骨架）
+prj/                    全部工程集中于此（2026-10-01 归类；本地路径同为 D:\FPGA\prj\）
+  ├─ project_N/              各 Vivado 工程（rtl / sim / scripts / xdc / docs）
+  ├─ ibert_ultrascale_gth_0/ IBERT 眼图实验工程
+  ├─ aurora_64b66b_loop_ex/  Aurora 官方例程留档（内含串口调试桥）
+  └─ 0DMA_uart2ddr/          MicroBlaze+DDR4+DMA 参考设计（未验证，仅作骨架）
 docs/                   文档中心：实操单、实施单、测试报告、调试记录（脱敏快照）
 docs/images/            本 README 引用的拓扑图
 AGENTS.md               工程规范：事实源优先级、硬件事实卡、CDC/ILA/XDC 约定、坑账本

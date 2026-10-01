@@ -58,7 +58,7 @@
 ## 四、工程结构与脚本规范
 
 ```
-D:\FPGA\project_N\
+D:\FPGA\prj\project_N\
 ├── rtl/            # 设计 RTL（官方栈按子目录分 arp/ icmp/ udp/ gmii_to_rgmii/）
 ├── shared_logic/   # Aurora 例程共享逻辑（派生文件也放这，命名 *_ext/_shared）
 ├── ip/             # 只存 .xci（import_ip + generate_target 重新生成，产物不入 git）
@@ -156,7 +156,7 @@ D:\FPGA\project_N\
 - ✅ **prj9 尾巴 = 全量传输 0.4% 丢失已定案修复（09-21 晚）**：判决位流 build9v（三域 ILA）差分链算术闭合——pack 输出队列 2 深溢出吞 tlast 字→相邻帧合并（7×2+9×2=32，git d9327bd）；队列 2→16（0ee2611）后全量 10MB **100%+SHA 一致**（历史首次）；真实业务传输层 json_reliable.py 交付 100%/0 重传
 - ⏭️ 下一步（09-26 导师定案：DDR 先行，路线图 #14）：**D 线 DDR4 队列缓存**——D1 MIG 校准复验（prj4 位流在库）→ D2 队列后端 DDR 化 → D3 判别复测 → D4 缓存/直通双模式 → D5 AXI DMA；BRAM v2 = 回退。并行：双板双链路组网（10G 模块 4 只 + LC 跳线 4 条已齐备，零采购）。后续：过载冻结根因（看门狗就位）→ IBERT 眼图（空闲通道 C/D）
 - 🔄 project_4 MIG 已解冻移入主线（#14，D1 校准复验起步）；⏸️ 挂起区：串口桥三级验证 · project_7 内环 · 8b/10b 练手（恢复触发条件见本节附 A）
-- ✅🔬 **prj10 W2 内存桥 RTL + xsim 仿真（09-29）**：`project_10/`（三层 RTL + AXI4 RAM 替身 + 六用例 TB），`=== prj10 W2 SIM: PASS (0 errors) ===`；一键复现 `sim\run_sim.bat`（只用 xvlog/xelab/xsim，**未建 Vivado 工程/未上板**，prj4·prj9 零改动）。实测单桥服务 3.11/3.07 µs 每帧（开工草案 §九 漏算 8b↔512b 逐字节转换，已修正；节拍结论不变）。bring-up 修掉 AXI R 通道握手违规 / 尾拍不满 64B 卡死 / 描述符长度清零竞争三条真 BUG（见 vault 执行记录）
+- ✅🔬 **prj10 W2 内存桥 RTL + xsim 仿真（09-29）**：`prj/project_10/`（三层 RTL + AXI4 RAM 替身 + 六用例 TB），`=== prj10 W2 SIM: PASS (0 errors) ===`；一键复现 `sim\run_sim.bat`（只用 xvlog/xelab/xsim，**未建 Vivado 工程/未上板**，prj4·prj9 零改动）。实测单桥服务 3.11/3.07 µs 每帧（开工草案 §九 漏算 8b↔512b 逐字节转换，已修正；节拍结论不变）。bring-up 修掉 AXI R 通道握手违规 / 尾拍不满 64B 卡死 / 描述符长度清零竞争三条真 BUG（见 vault 执行记录）
 
 ### 附 A · 工程索引详表（内部视角，原 README 2026-10-01 迁入）
 
@@ -164,23 +164,23 @@ D:\FPGA\project_N\
 
 | 目录 | 工程 | 达成 | 说明 |
 |---|---|---|---|
-| `project_1/` | MicroBlaze 最小系统 | ✅ M1（08-11） | BD design_1：MicroBlaze + UART Lite + AXI Interconnect |
-| `ibert_ultrascale_gth_0/` | IBERT 眼图实验 | ✅ 08-27 | 10G PRBS 跨口过纤 0E0；眼图截图已归档 |
-| `aurora_64b66b_loop_ex/` | Aurora 例程 + UART 桥 | ✅ 08-31 内环验证 | 10G duplex X1Y11；`uart_bridge.v`（串口桥位流在库，验证挂起见下） |
-| `project_6/` | 以太网 UDP 网口栈 | ✅ 09-04 上板验证 | 官方 39_eth_udp_loop 整包移植；ping/UDP 回环/Wireshark 四包链 |
-| `project_8/` | Aurora-UDP 数据级桥 | ✅ M2（09-18）判据全过 | 以太网栈 + Aurora 64b/66b（X1Y11 内环）；axis_word_pack/unpack 8↔64 + 双向帧泵；`rtl/*_dly.v` = IDELAY 1250ps 修复版；排障脚本与 ILA 数据在 `scripts/` |
-| `project_9/` | 真光链路版（双笼 A↔B） | ✅ 真光链路判据全过（09-21，f7c8be8） | prj8 全部验证资产复用；loopback=3'b000 正常模式；判决位流 build9v/w（三域 ILA）；0.4% 丢失已定案修复（pack 队列 2→16，0ee2611），全量 10MB 100%+SHA |
+| `prj/project_1/` | MicroBlaze 最小系统 | ✅ M1（08-11） | BD design_1：MicroBlaze + UART Lite + AXI Interconnect |
+| `prj/ibert_ultrascale_gth_0/` | IBERT 眼图实验 | ✅ 08-27 | 10G PRBS 跨口过纤 0E0；眼图截图已归档 |
+| `prj/aurora_64b66b_loop_ex/` | Aurora 例程 + UART 桥 | ✅ 08-31 内环验证 | 10G duplex X1Y11；`uart_bridge.v`（串口桥位流在库，验证挂起见下） |
+| `prj/project_6/` | 以太网 UDP 网口栈 | ✅ 09-04 上板验证 | 官方 39_eth_udp_loop 整包移植；ping/UDP 回环/Wireshark 四包链 |
+| `prj/project_8/` | Aurora-UDP 数据级桥 | ✅ M2（09-18）判据全过 | 以太网栈 + Aurora 64b/66b（X1Y11 内环）；axis_word_pack/unpack 8↔64 + 双向帧泵；`rtl/*_dly.v` = IDELAY 1250ps 修复版；排障脚本与 ILA 数据在 `scripts/` |
+| `prj/project_9/` | 真光链路版（双笼 A↔B） | ✅ 真光链路判据全过（09-21，f7c8be8） | prj8 全部验证资产复用；loopback=3'b000 正常模式；判决位流 build9v/w（三域 ILA）；0.4% 丢失已定案修复（pack 队列 2→16，0ee2611），全量 10MB 100%+SHA |
 
 **🔄 正在推进**
 
 | 目录 | 工程 | 状态 |
 |---|---|---|
-| `project_4/` | MIG/DDR4（D 线第一步，09-26 #14 解冻） | 校准位流在库（`impl_1/mig_verify_top.bit`，WNS=+0.024/WHS=+0.004，ui_clk=300.12MHz，DDR4 4GiB），D1 校准复验待上板 |
-| `project_10/` | 内存进环路（DDR4 帧队列） | W2 仿真 PASS（09-29）→ W3 轨A 已执行（A1 端口 37 信号 / A2 延迟扫 / A3 尾拍 WSTRB 修复 / A4+A5 桥+真 MIG 时序收敛 WNS=+0.030，`prj_uiclk/`）；上板联调待场次 |
+| `prj/project_4/` | MIG/DDR4（D 线第一步，09-26 #14 解冻） | 校准位流在库（`impl_1/mig_verify_top.bit`，WNS=+0.024/WHS=+0.004，ui_clk=300.12MHz，DDR4 4GiB），D1 校准复验待上板 |
+| `prj/project_10/` | 内存进环路（DDR4 帧队列） | W2 仿真 PASS（09-29）→ W3 轨A 已执行（A1 端口 37 信号 / A2 延迟扫 / A3 尾拍 WSTRB 修复 / A4+A5 桥+真 MIG 时序收敛 WNS=+0.030，`prj_uiclk/`）；上板联调待场次 |
 
-**⏸️ 挂起（恢复触发条件见 vault `操作文档/挂起/README`）**：串口桥 M-D 三级验证（解 dbg 探针时钟域 undefined + AE33 输入方向）· `project_7/` SFP 前端内环（09-22 定案后不再复活，PCS/PMA 配置留档）· 8b/10b 练手（IBERT 已覆盖）· prj9 传输效率深挖 B 组（B1 板卡自发流/B2 C 发包器/B3 帧泵 B 硬件提速；E1–E5 已随实操单 v2 移回主线）。
+**⏸️ 挂起（恢复触发条件见 vault `操作文档/挂起/README`）**：串口桥 M-D 三级验证（解 dbg 探针时钟域 undefined + AE33 输入方向）· `prj/project_7/` SFP 前端内环（09-22 定案后不再复活，PCS/PMA 配置留档）· 8b/10b 练手（IBERT 已覆盖）· prj9 传输效率深挖 B 组（B1 板卡自发流/B2 C 发包器/B3 帧泵 B 硬件提速；E1–E5 已随实操单 v2 移回主线）。
 
-**🗄️ 归档/工具**：`project_2/` 8b/10b 练手遗骸 · `project_3/` Aurora IP 定版 xci · `0DMA_uart2ddr/`（MicroBlaze+MIG+DMA+UART 参考 BD，Vivado **2019.2**，**未验证勿当资产**，D2/D5 骨架）· `scripts/` 顶层 Tcl 骨架 · `KU_IO.xdc` + `docs/KU引脚表.xlsx`（GBK）· `docs/参考_cross_FMC_4SFP_GTH引脚表_2026-08-27.md`。
+**🗄️ 归档/工具**：`prj/project_2/` 8b/10b 练手遗骸 · `prj/project_3/` Aurora IP 定版 xci · `prj/0DMA_uart2ddr/`（MicroBlaze+MIG+DMA+UART 参考 BD，Vivado **2019.2**，**未验证勿当资产**，D2/D5 骨架）· `scripts/` 顶层 Tcl 骨架 · `KU_IO.xdc` + `docs/KU引脚表.xlsx`（GBK）· `docs/参考_cross_FMC_4SFP_GTH引脚表_2026-08-27.md`。
 
 ### 附 B · docs/ 文档中心指向（原 README 迁入）
 
