@@ -94,7 +94,7 @@ D:\FPGA\project_N\
 2. **ILA 单会话三段式**：同一 Vivado batch 会话内 arm → 起流量（ping）→ upload → CSV。arming 易失，**不能跨会话**。触发探针名要与 probes.ltx 一致；`TRIGGER_POSITION` 属性不被接受（省略或 catch）。
 3. **网表解剖**：`open_checkpoint` 两份 dcp 对比元件/位置/绑定（prj8 定位 BUFIO 被吸收即此法）。
 4. **延迟扫描**：时序边缘问题时改一个参数出一流（IDELAY 500→1250ps 即收敛过程），每次记录 ping 通过率。
-5. 每轮调试落**调试记录**（现象→假设→实验→证据→结论五要素），入 vault `操作文档/调试记录_*.md`。
+5. 每轮调试落**调试记录**（现象→假设→实验→证据→结论五要素），入 vault `调试记录/`（2026-10-01 起记录类独立成目录，见第八节）。
 
 ## 七、验证判据规范
 
@@ -113,6 +113,11 @@ D:\FPGA\project_N\
 - **每个里程碑一提交**，信息含：改了什么/为什么/WNS/判据结果。多行信息写临时文件 `git commit -F`，提交后删。
 - 提交语义前缀：`project_N:`（工程主线）/ `project_N fix:`（修根因）/ `docs:`（文档）。
 - vault 文档快照入 `docs/操作文档/` 须脱敏（用户名→`***`，人名→`前辈`）；命名 `[阶段]_prj标识_概要_YYYY-MM-DD`。vault（Obsidian 知识库）已于 09-19 同步采用本规范，类别扩展：汇报/规划/追踪/结论；重命名文件 frontmatter 加 `alias: 旧名` 保旧链接可达；新旧名映射见 `docs/README.md`。豁免：`README.md`、`agent.md`（vault 会话入口镜像，冲突以本文件为准并回改镜像）、非 Markdown 数据文件。
+- **文档两大类分开放（2026-10-01 起；vault 与 `docs/` 同构）**：
+  · `操作文档/` = **操作开发类**——读它是为了"照着做"：实操单 / 实施单（开工草案）/ 开工开发文档 / 前置清单 / 上板验证单 / 作战卡 / 演示文档；`操作文档/挂起/` 为状态轴收纳区。
+  · `调试记录/` = **调试记录类**——读它是为了"看结果/看证据"：调试记录 / 执行记录 / 测试报告 / 独立复核 / 断点核查 / 复现记录。
+  · 混合型**以主导内容归类**（证据为主 → 调试记录，步骤为主 → 操作文档）。记录类 frontmatter `type` 词表见 `docs/调试记录/README.md`。
+  · **移动/重命名必须同步修正全库引用**（vault wiki 链接 + `docs/` 镜像 + 工程 README），并在提交信息里注明处数；记录类**只增不改历史结论**，订正用"补记"小节并保留原数字与出处。
 - 工程状态变化 → 更新本文件「当前工程状态」+ README「当前推进」，并向用户报告一句。
 
 ## 九、坑账本（踩过的坑 = 规范的来源）
@@ -139,6 +144,7 @@ D:\FPGA\project_N\
 | 18 | 改完 `.ps1` 后 BOM 又被剥掉 | **编辑工具/文本重写会静默剥掉 BOM**（2026-10-01 实证：5 处定点 edit 后前 3 字节从 `239 187 191` 变回 `35 32 61`，`ParseFile` 0 → 27 错）。⇒ **任何 `.ps1` 改动后必须复验前 3 字节 = 239 187 191**，且**解析判据要用 `[Parser]::ParseFile`（= `-File` 的真实读法）**，只用显式 UTF-8 的 `ParseInput` 会给出"逻辑 0 错误"的**假安全**（同一文件两种读法一个 0 一个 27）|
 | 19 | **XDC/Tcl 行尾 `#` 注释非法 → 那条约束根本没生效** | Tcl 里 **`#` 只在「命令行首」才是注释**；写在命令**行尾**的 `#` 会被当成**多余参数**传给命令 → `[Common 17-165] Too many positional options when parsing ...` **CRITICAL WARNING，命令失败**。prj9 实证：`xdc/aurora_udp_bridge.xdc:92` 的 `set_false_path ... # prj9: 通配符覆盖 _0 与 _1 双核` 未生效（该文件 40 处行首注释均合法，**行尾注释全文件仅此 1 处 ↔ 构建日志恰好 1 条 CRITICAL WARNING**，一一对应）。⇒ **XDC/脚本里注释一律独立成行**；排查「约束怎么没生效」先数 Too many positional options |
 | 20 | `xdc_lint` 对 GT 参考时钟报 `MISSING_IOSTANDARD`（**误报，别照改**） | `gt_refclk_p/n`（T6/T5 = MGTREFCLK1_X1Y2）是 **GT 专用引脚**，不需要也不应写 IOSTANDARD。事实源：官方 GT Wizard 例程 `gtwizard_ultrascale_0_example_top.xdc` L56-57 **同样只写 `package_pin`**（而同文件对 `sys_clk`/`sfp_rs` 等普通 IO 都写了 IOSTANDARD）；prj9 同写法综合日志 **0 条 NSTD-1/BIVC-1**。⇒ 见此类告警**先判端口是否为 GT 专用脚**，是则忽略 |
+| 21 | **vivado-mcp `start_session` 必失败（`RuntimeError: Vivado GUI 进程提前退出`）** | 0.3.26 把「`vivado_mcp_server.tcl` 的路径」写进一个只含 ASCII 的临时 `.tcl`（`D:\FPGA\tmpXXXX.tcl`）交给 `vivado -source`，而 **Vivado 的 Tcl 按系统 ANSI(GBK) 解码该文件** → 安装路径里的「毕设」解成「姣曡??」→ `couldn't read file ... no such file or directory`。与 #1 同根（GBK 码位）。**修法 = 把整个安装搬到纯 ASCII 路径**（2026-10-01 实做：`C:\Users\15266\Desktop\毕设\.mcp-pilot` → `D:\vivado-mcp`，含 venv+site）；`C:` 侧旧路径留转发壳。**注意 mcp 包自身的 `_check_ascii_paths` 已经把非 ASCII 路径列为红线**，但只查 vivado_path 与 cwd，**查不到包安装路径**——所以这条只能靠安装位置保证 |
 
 ## 十、当前工程状态（一屏速览，详表见 README.md）
 
