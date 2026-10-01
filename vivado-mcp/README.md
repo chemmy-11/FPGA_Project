@@ -96,6 +96,15 @@ vivado_mcp/
 依赖本机路径与虚拟环境，**不在本仓库内**。本目录提供的是**与机器无关的工具本体**，
 按上面的"安装与使用"即可在任意机器上复现。
 
-## 来源与许可
+## 来源、许可与改动
 
-本工具为本项目自研（源码中多处注释引用本项目坑账本条目）。随仓库发布，**保留所有权利**——详见仓库 [README](../README.md) 的版权说明。
+- **上游项目**：**[mapleleavessssssss-wq/vivado-mcp](https://github.com/mapleleavessssssss-wq/vivado-mcp)**
+  * 版本 **v0.3.26**（2026-09-22）· 上游默认分支 `main` · PyPI 包名 `vivado-mcp`
+  * 上游定位：让 Claude Code / Cursor / Codex 驱动本地 FPGA 全流程（30 个精选工具 + 8 个证据驱动 Prompt + GUI/Tcl/attach 会话）
+- **许可**：**Apache License 2.0** —— 全文见同目录 [`LICENSE`](LICENSE)（随源码一并提供，符合 Apache-2.0 第 4 条对再分发的要求）
+- **本目录所做的改动**：**零代码改动**，仅目录重组。
+  * 与上游 v0.3.26 逐字节比对：**52 个文件完全相同、0 个被修改**
+  * 上游布局为 `src/vivado_mcp/` + 顶层 `scripts/` + 顶层 `skills/`；本目录把包平铺为 `vivado_mcp/`，并把 `scripts/`（1 个 Tcl）与 `skills/`（5 份 SKILL.md）移入包内——这 6 个文件内容原样
+- **版本适配说明**：上游作者以 **Vivado 2019** 为基准开发；本项目运行于 **Vivado 2023.1**。
+  * 实测：离线工具（`parse_xpr` / `parse_bit_header` / `parse_ltx` / `xdc_lint`）与 Vivado 会话在该版本下均可用
+  * 已知差异：Vivado **2020.1+ 生成的 JSON 版 `.xci`** 会让 `compare_xci` 报 XML 解析失败（上游按 XML 版 `.xci` 设计）——本项目 2023.1 的 `.xci` 全部为 JSON 版，故该工具在本项目内不可用

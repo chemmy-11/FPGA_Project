@@ -1,5 +1,12 @@
 # FPGA_Project — FPGA 高速互联网络平台
 
+![FPGA](https://img.shields.io/badge/FPGA-Kintex_UltraScale_XCKU060-0b7285?style=flat-square)
+![板间干线](https://img.shields.io/badge/%E6%9D%BF%E9%97%B4%E5%B9%B2%E7%BA%BF-Aurora_64b%2F66b_%C2%B7_10G-7048e8?style=flat-square)
+![端点接入](https://img.shields.io/badge/%E7%AB%AF%E7%82%B9%E6%8E%A5%E5%85%A5-%E5%8D%83%E5%85%86%E4%BB%A5%E5%A4%AA%E7%BD%91_%C2%B7_UDP-0c8599?style=flat-square)
+![工具链](https://img.shields.io/badge/%E5%B7%A5%E5%85%B7%E9%93%BE-Vivado_2023.1-e8590c?style=flat-square)
+![状态](https://img.shields.io/badge/%E7%8A%B6%E6%80%81-%E5%8D%95%E6%9D%BF%E9%97%AD%E7%8E%AF%E5%B7%B2%E5%AE%8C%E6%88%90-2f9e44?style=flat-square)
+![许可](https://img.shields.io/badge/%E8%AE%B8%E5%8F%AF-%E4%BF%9D%E7%95%99%E6%89%80%E6%9C%89%E6%9D%83%E5%88%A9-c92a2a?style=flat-square)
+
 基于正点原子 KU060 开发板（Kintex UltraScale `xcku060-ffva1156-2-i`）搭建的多节点数据交换平台：
 
 - **端点接入**：PC / 树莓派等标准以太网设备，经板载千兆 RJ45 网口接入
@@ -156,9 +163,11 @@ python scripts\udp_verify.py     # 判据：回显一致 12/12
 
 ## 配套工具：vivado-mcp
 
-[`vivado-mcp/`](vivado-mcp/) 是本项目自研的 **MCP 服务**，把 Vivado 的常用操作封装成 **32 个工具**
-（读工程 / 查时序 / 审约束 / 看波形 / 跑综合实现 / 抓 ILA），供 AI 客户端直接调用，不必在 GUI 里逐步点。
-随仓库提供源码副本，**不含任何本机专有配置**，可在任意机器复现。
+[`vivado-mcp/`](vivado-mcp/) 把 Vivado 的常用操作封装成 **32 个工具**（读工程 / 查时序 / 审约束 / 看波形 / 跑综合实现 / 抓 ILA），供 AI 客户端直接调用，不必在 GUI 里逐步点。随仓库提供源码副本，**不含任何本机专有配置**，可在任意机器复现。
+
+> **来源**：上游项目 **[mapleleavessssssss-wq/vivado-mcp](https://github.com/mapleleavessssssss-wq/vivado-mcp)** v0.3.26（Apache-2.0）。
+> 与上游**逐字节比对：52 个文件完全相同、0 个修改**，仅做目录重组（上游 `src/vivado_mcp/` + 顶层 `scripts/` `skills/` → 本目录平铺入包内）。
+> 上游以 **Vivado 2019** 为基准，本项目运行于 **Vivado 2023.1**——离线工具实测可用；已知差异见 [工具说明](vivado-mcp/README.md)。
 
 ```powershell
 $env:PYTHONPATH = "D:\FPGA\vivado-mcp"
@@ -203,4 +212,5 @@ scripts/                顶层 Tcl 骨架（建工程 / 构建 / 烧录）
 
 ---
 
-**版权**：Copyright © 2026，**保留所有权利**（All rights reserved）。本仓库为毕业论文课题资料，未授予开源许可；如需引用或复用请联系作者。
+**版权**：本仓库自有内容 Copyright © 2026，**保留所有权利**（All rights reserved）——为毕业论文课题资料，未授予开源许可，如需引用或复用请联系作者。
+**例外**：[`vivado-mcp/`](vivado-mcp/) 为第三方开源项目的源码副本，遵循其上游 **Apache License 2.0**（全文见 [`vivado-mcp/LICENSE`](vivado-mcp/LICENSE)），不受上述声明约束。
