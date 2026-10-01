@@ -1,0 +1,4 @@
+# R4 TB 每次重跑的产物（源与参考输出入库）
+compile_out.txt
+elab_out.txt
+sim_out.txt

@@ -62,7 +62,7 @@ cd D:\FPGA\project_9; python scripts\udp_verify.py  # 回显一致 12/12
 - JTAG：Digilent USB-JTAG（210512180081）；串口 COM7。
 - 各工程脚本（create/build/program/board_test，幂等）在 `D:\FPGA\project_N\scripts\`。
 
-## 当前状态（2026-09-30）
+## 当前状态（2026-10-01）
 
 - 已闭环：M1（08-11）· IBERT 物理层（08-27）· Aurora 链路层（08-31）· 以太网 UDP 网口栈（09-04）· 数据级桥 M2（09-18）· **prj9 双笼真光链路判据全过（09-21，git f7c8be8）** · **会话 JSON 传输质量评测（09-21）**。
 - 评测结论（`json_storm.py`）：质量档 100%+SHA 一致 · 性能档 19.3 Mbps · 容量档送 70 回 22.9 Mbps · 损坏/乱序全程 0。**口径定案（09-29）**：19.3 Mbps = **PC 侧 `time.sleep` 所致**（561 µs/帧 ≈ Windows 高精度定时器 ~500 µs 分辨率；4 进程各 ~17.5 Mbps 反证与 GIL 无关）；22.9 Mbps = **开环冲击下界，非 fabric 结构极限**（设计报告 v0.5 §3.3.2 已修正，旧"串行上限 23 Mbps"归因作废）。待跑判别实验：`json_storm.py --gap-ms 0`。过载触发板端硬冻结（重烧恢复），根因待查——**追线速前必须先修**。详见 [[操作文档/阶段二之十_prj9_传输效率与瓶颈判定实操单_2026-09-29]]。
@@ -76,6 +76,8 @@ cd D:\FPGA\project_9; python scripts\udp_verify.py  # 回显一致 12/12
   (c) **W3 前置硬阻断**：桥**缺 12 个 AXI4 端口**（awid/bid/arid/rid + lock/cache/prot/qos）→ **按当前端口清单无法与 prj4 的 `ddr4_0` 直接例化**（约 12 行 wrapper 可补）；另发现 **2 个真缺陷**（`out_inc/out_dec` 多驱动、超长帧写 FSM 永久卡 `W_DRAIN`），均已带最小复现并授权修。
 - **MIG/D1 断点核查完成（09-29 深夜）**：prj4 **综合+实现+位流+ILA 探针全部在库**（`runs/impl_1/mig_verify_top.bit` 24.1 MB / `mig_verify_top.ltx`，2026-09-01，Version=2023.1）；fully routed 45206/45206、DRC 0 Error、**WNS=+0.024 / WHS=+0.004 ns（零余量）**；**ui_clk=300.12 MHz**（三链一致）、**DDR4=4 GiB**（`Capacity=512` 是器件深度代号，不是容量）；**引脚 112/112 与布线结果全量一致**。→ **D1 = 烧现有位流复验（分钟级），不需要建工程**；唯一未知量是"校准从未上板"。另：例程自带 `mig_verify_top.v` 的 256 拍突发跨 4KB 边界 3 次（AXI4 违规）——**D1 若失败，第一处置动作是把 awlen/arlen 降到 ≤63 重出位流**。详见 `D:\FPGA\project_4\D1_MIG断点核查_2026-09-29.md`。
 - **新发现参考实现 `D:\FPGA\0DMA_uart2ddr\`**：MicroBlaze + DDR4(MIG) + AXI DMA + UART 完整 BD，**已出位流**（`design_1_wrapper.bit`，2026-06-01，**Vivado 2019.2**）→ D2/D5 的现成骨架；**是否真上板跑通未核实，不得写成已验证**；亦不在 AGENTS.md 工程清单内，属"存在但未登记"。
+- **R4 过载冻结机制 · 离线仿真证实（2026-10-01，板不在手期间推进）**：新建 TB `D:\FPGA\project_9\sim\r4_start_lost\`（只读 udp_tx，**prj9 rtl/xdc/prj 零改动**，未动 project_10）。四步激励逐字节证明：忙态到达的 `rec_pkt_done` 单拍脉冲**被整帧丢弃**（`nframes` 不增）→ 该帧字节留存无帧边界 FIFO（残留 50B）→ 下一个 start **用新长度读旧字节**（实得 `d0..`，期望 `e0..`）→ **终态永久偏移 50B**。一键复现 `run_sim.ps1`（带 BOM，退出码 0/2/1 + 自动判决）。**修复方向已设计未施行**（案 A 忙时锁存 pending ~10 行 / 案 B 帧边界队列 = D2 语义）——不改 RTL 因 E1–E5 用现有判决位流、且 prj10 W3 场次3 沿用 prj9 rtl。**E2 判读升级为三分归因**（板端丢帧 > 泵A+泵B 计数之和 ⇒ 差额即栈 TX 侧）；**E3 判据不受影响**（12.5 µs > 忙窗 ⇒ start 恒落 idle）。详见 [[操作文档/阶段二之十_prj9_过载冻结R4机制仿真复现_2026-10-01]]
+- **E5 配对留档 + AGENTS.md 补 BOM 纪律（2026-10-01，工程提交 eb23b94）**：`verdict_capture.ps1` 每次快照自动归档到 `scripts\ila_archive\<runId>\{BEFORE,AFTER}\`（3 CSV + manifest.txt），根治 09-21「固定名 `-force` 覆盖 ⇒ 配对丢失 ⇒ 六段对账不可重算」；AGENTS.md 坑账本补 **#17**（PS 5.1 读无 BOM 中文 `.ps1` 必报语法错，非代码坏）与 **#18**（编辑会静默剥 BOM ⇒ 改完必须复验前 3 字节；解析判据用 `ParseFile` 而非 `ParseInput`）
 - **工具纪律（新增）**：Vivado MCP（`vivado-mcp`）已打通，脚本桥 `毕设\.mcp-pilot\mcp_ctl.py`（离线工具：parse_xpr/parse_bit_header/parse_ltx/xdc_lint/compare_xci 等；Vivado 会话与综合/实现/仿真**全局串行**，锁文件 `D:\FPGA\.mcp-pilot-vivado.lock`；烧板永远归用户）。
   **本仓库所有 `.ps1` 必须带 UTF-8 BOM**——本机是 Windows PowerShell **5.1**，读无 BOM 的中文 `.ps1` 按 CP936 解码必报语法错（`verdict_capture.ps1` 即此坑，且它同时还有真结构缺陷：L34 断行 + L67–L94 重复块，已授权修）。
 - **prj10 内存进环路 · Q1–Q5 全部定案（2026-09-30 导师）→ 实施单 v1.0**：执行文档 [[操作文档/阶段三_prj10_内存进环路开工草案_2026-09-29]]（**09-30 升格实施单 v1.0**，里程碑 **W0–W6**，W1 = #14 D 线 D1 两线共用；约 4–5 周）；决策留痕 = 路线图 **#15**；需求对齐版 [[汇报/汇报_阶段三_prj10_内存进环路需求对齐_2026-09-29]]。缺口体检见 `结论_cross_prj9-prj10_进度体检报告_2026-09-29.md`，W3 前置见 [[操作文档/阶段三_prj10_W3前置清单_2026-09-29]]。
