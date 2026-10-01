@@ -1,13 +1,9 @@
 # FPGA_Project — FPGA 高速互联网络平台
 
+[![Vivado](https://img.shields.io/badge/Vivado-2023.1-e8590c?style=flat)](scripts/)
+[![FPGA](https://img.shields.io/badge/FPGA-Kintex_UltraScale_XCKU060-0b7285?style=flat)](prj/)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue?style=flat)](LICENSE)
 [![CI](https://github.com/chemmy-11/FPGA_Project/actions/workflows/ci.yml/badge.svg)](https://github.com/chemmy-11/FPGA_Project/actions/workflows/ci.yml)
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square)](LICENSE)
-[![Last Commit](https://img.shields.io/github/last-commit/chemmy-11/FPGA_Project/master?style=flat-square)](https://github.com/chemmy-11/FPGA_Project/commits/master)
-[![Vivado](https://img.shields.io/badge/Vivado-2023.1-e8590c?style=flat-square)](docs/README.md)
-[![FPGA](https://img.shields.io/badge/FPGA-Kintex_UltraScale_XCKU060-0b7285?style=flat-square)](AGENTS.md)
-[![板间干线](https://img.shields.io/badge/%E6%9D%BF%E9%97%B4%E5%B9%B2%E7%BA%BF-Aurora_64b%2F66b_%C2%B7_10G-7048e8?style=flat-square)](prj/project_9)
-[![端点接入](https://img.shields.io/badge/%E7%AB%AF%E7%82%B9%E6%8E%A5%E5%85%A5-%E5%8D%83%E5%85%86%E4%BB%A5%E5%A4%AA%E7%BD%91_%C2%B7_UDP-0c8599?style=flat-square)](prj/project_6)
-[![文档](https://img.shields.io/badge/%E6%96%87%E6%A1%A3-docs%2F-495057?style=flat-square)](docs/README.md)
 
 基于正点原子 KU060 开发板（Kintex UltraScale `xcku060-ffva1156-2-i`）搭建的多节点数据交换平台：
 
