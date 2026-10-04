@@ -140,7 +140,7 @@ module frame_mem_if #(
     wire        uc_wr_en;  wire [8:0]  uc_din;
     wire        uc_rd_en;
     // ui -> user : frame bytes
-    wire [7:0]  rb_dout;  wire rb_empty, rb_full;
+    wire [7:0]  rb_dout;  wire rb_empty, rb_full;  wire [BF_AW:0] rb_level;
     wire        rb_wr_en;  wire [7:0]  rb_din;
     wire        rb_rd_en;
     // ui -> user : read descriptors {none, len[15:0], slot[7:0]}
@@ -167,7 +167,7 @@ module frame_mem_if #(
 
     async_fifo #(.DW(8), .AW(BF_AW)) u_rd_bytes (
         .wr_clk(ui_clk), .wr_rst_n(ui_rst_n), .wr_data(rb_din), .wr_en(rb_wr_en),
-        .wr_full(rb_full), .wr_level(),
+        .wr_full(rb_full), .wr_level(rb_level),
         .rd_clk(user_clk), .rd_rst_n(user_rst_n), .rd_data(rb_dout), .rd_en(rb_rd_en),
         .rd_empty(rb_empty), .rd_level());
 
@@ -285,7 +285,7 @@ module frame_mem_if #(
     //=========================================================================
     // 4. read side: command issue + byte emission
     //=========================================================================
-    reg  [1:0]  est;                    // 0 idle, 1 emit, 2 done
+    reg  [1:0]  est;                    // 0 idle, 3 PRIME, 1 emit, 2 done
     reg         rd_busy_r;
     reg  [15:0] rd_cnt;
     reg  [15:0] u_rd_frame_cnt;
@@ -320,9 +320,21 @@ module frame_mem_if #(
                         rd_len_o  <= rd_dout[23:8];
                         rd_slot_o <= rd_dout[7:0];
                         rd_cnt    <= 16'd0;
-                        est       <= 2'd1;
+                        est       <= 2'd3;        // W3 集成: 先攒帧再发射(见 2'd3)
                     end
                 end
+            end
+            // ---- W3 集成改动(2026-10-04): PRIME 状态 = 攒满整帧再发射 ----
+            // 上游(原 prj9 帧泵)对 pack 的契约是"整帧缓存后无间隙泵出"(frame
+            // integrity); 若沿用 FWFT 直通边发, DDR 读回节拍跟不上 user_clk 消费
+            // 时帧中间会出现无效拍 -> Aurora 64b/66b 帧协议违例 -> TX 楔死
+            // (= prj9 09-20 B 回显裸 FIFO 直通的同款根因)。rb FIFO 深 4096 >=
+            // MAX_LEN 1538, 攒满一帧结构上可行; rb_level 为读域保守值(只会低估
+            // 不会高估), 故 rb_level >= len 即保证帧内字节全部到达, 发射期间
+            // 帧中零气泡, 且两帧间天然有空闲拍(满足 pack 帧尾/帧间隔要求)。
+            2'd3: begin
+                if (rb_level >= {3'b0, rd_len_o})
+                    est <= 2'd1;
             end
             2'd1: begin
                 if (!rb_empty) begin

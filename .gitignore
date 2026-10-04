@@ -76,3 +76,7 @@ prj/project_10/prj_uiclk/vivado/
 
 # ===== vivado-mcp 工具运行日志（本机运行产物，不入库）=====
 vivado-mcp/logs/
+
+# ===== prj10 集成工程（生成的 Vivado 工程目录 + 路由临时文件，可由 scripts/*.tcl 幂等重建）=====
+prj/project_10/prj_loop/vivado/
+prj/project_10/prj_loop/.tmpCRC/
