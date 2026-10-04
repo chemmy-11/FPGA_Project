@@ -40,7 +40,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $env:PYTHONUTF8 = '1'                     # 必须: GBK 控制台打对勾字符会崩
 $py   = 'C:\Users\15266\AppData\Local\Python\pythoncore-3.14-64\python.exe'
-$root = 'D:\FPGA\project_9'
+$root = 'D:\FPGA\prj\project_9'   # 2026-10-02 起工程迁到 prj\ 下
 $src  = 'testdata\session_full.jsonl'
 Set-Location $root
 $stamp  = Get-Date -Format 'yyyyMMdd_HHmmss'
