@@ -245,7 +245,10 @@ module mig_verify_top (
         .c0_ddr4_s_axi_rresp    (rresp_i),
         .c0_ddr4_s_axi_rid      (),
         .c0_ddr4_s_axi_rdata    (rdata_i),
-        .sys_rst                (sys_rst_btn)
+        // ★ 2026-10-06 修复：MIG 的 sys_rst 是**高有效**，板载按钮 AC34 是**低有效**
+        //   （idle=1 / 按下=0）。原来直连 → 按钮不按时 MIG 一直被复位、校准永不启动。
+        //   对照：prj9 顶层用 ~sys_rst_n 得到内部高有效复位（板上已验证可用）。
+        .sys_rst                (~sys_rst_btn)
     );
 
 endmodule
