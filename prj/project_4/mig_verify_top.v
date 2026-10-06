@@ -175,7 +175,10 @@ module mig_verify_top (
     wire [7:0]  probe_rbeat = rbeat;
     wire [5:0]  probe_flags = {test_done, test_pass, c0_init_calib_complete,
                                bresp_bad, rresp_bad, rvalid_i};
-    // ★ 2026-10-06 诊断加探: err=N-1 结构性错位(前2拍对/其后全错), 需看读回数据本体
+    // ★ 2026-10-06 诊断加探(保留, 纯观测增强): 10-06 排查记录见 调试记录/; 诊断结论:
+    //   例程 AXI 激励在本板读回错位(err=N-1, 写A5读回历史残留), 根因未定位;
+    //   DDR4 物理层健康(MIG JTAG 校准全绿), 内存写读正确性以 prj10 集成位流
+    //   (aurora_mem_bridge) 的全链判据为准(10-06 全过: ping20/20+udp12/12+桥零损)
     wire [255:0] probe_rdata = rdata_i[255:0];            // 读回前 32 字节(4x64B 段, 看 01/00 交替是段内还是段间)
     wire [3:0]  probe_hs    = {rvalid_i, rlast_i, wready_i, awready_i};
 
