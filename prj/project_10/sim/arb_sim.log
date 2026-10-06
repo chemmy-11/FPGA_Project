@@ -1,0 +1,19 @@
+
+****** xsim v2023.1 (64-bit)
+  **** SW Build 3865809 on Sun May  7 15:05:29 MDT 2023
+  **** IP Build 3864474 on Sun May  7 20:36:21 MDT 2023
+  **** SharedData Build 3865790 on Sun May 07 13:33:03 MDT 2023
+    ** Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.
+    ** Copyright 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+
+source xsim.dir/arbsim/xsim_script.tcl
+# xsim {arbsim} -autoloadwcfg -runall
+Time resolution is 1 ps
+run -all
+[T2/T3] 双主并发 8 轮写完成: grant S00=8 S01=8 (差应<=1)
+[T4] 读方向: 跳过(数据正确性属桥的 W2 TB 范畴; AR 授权逻辑与 AW 同构)
+==== ARB_TB: 0 errors ====
+ARB_TB: PASS
+$finish called at time : 3655630 ps : File "D:/FPGA/prj/project_10/sim/arb_tb.sv" Line 150
+exit
+INFO: [Common 17-206] Exiting xsim at Tue Oct  6 22:27:13 2026...

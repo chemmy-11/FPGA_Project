@@ -26,7 +26,8 @@ add_files -fileset sources_1 [list \
     $P10/rtl/async_fifo.v \
     $P10/rtl/axi4_master_bridge.v \
     $P10/rtl/frame_mem_if.v \
-    $P10/rtl/aurora_mem_bridge.v]
+    $P10/rtl/aurora_mem_bridge.v 
+    $P10/rtl/axi_arb_2to1.v]
 
 ## ---- IP: prj9 五个(import_ip 避免生成物路径漂移; reg_slice x2 与 fifo_80b_echo
 ##      在 prj9 RTL 中未例化 —— 历史遗留, 保真导入, 忽略 unused 告警) ----
@@ -52,6 +53,7 @@ set_property -dict [list \
     CONFIG.Performance_Options {First_Word_Fall_Through} \
     CONFIG.Enable_Safety_Circuit {false} \
 ] [get_ips fifo_80b_echo]
+
 generate_target all [get_ips]
 
 ## ---- 合并约束(prj9 全文 + L92 修正 + prj4 DDR 107 脚) ----

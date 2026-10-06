@@ -74,10 +74,11 @@
 │                                                 "内存进环路"：以太网帧写入 DDR4
 │                                                 再按帧读出，为大容量排队打地基；
 │                                                 复用 project_9 全套数据通路
-│                                                 🔄 逻辑与时序预检已收敛，待上板联调
+│                                                 🔄 W3 内存插入已上板全过（2026-10-06）·
+│                                                 过载冻结已修复 · W4 两级全环路构建中
 │                                                 ▲
 ├─[MIG 例程]──► project_4   MIG DDR4 读写校准 ────┘
-│               🔄 校准复验待上板；向 project_10 提供 DDR4 控制器
+│               ✅ DDR4 校准上板通过（2026-10-06，MIG JTAG 报告全绿）
 │
 └─[MicroBlaze 例程]──► project_1   MicroBlaze 软核最小系统 ✅ 2026-08-11
                        跑通 FPGA 内软核 + Vitis 软件开发流；
@@ -102,11 +103,11 @@
 |---|---|---|---|
 | `prj/project_1/` | MicroBlaze 软核最小系统 | 串口打印 Hello World | ✅ 2026-08-11 |
 | `prj/project_3/` | Aurora 64b/66b IP 配置定版 | GT 内环 channel_up、零误码 | ✅ 2026-08-31 |
-| `prj/project_4/` | MIG DDR4 读写校准 | 校准完成 + 读写数据比对零误码；位流已产出 | 🔄 校准复验待上板 |
+| `prj/project_4/` | MIG DDR4 读写校准 | DDR4 上电校准（MIG JTAG 报告）+ 集成位流全链写读对账 | ✅ 2026-10-06（例程自带比对测试有自身缺陷，内存正确性以集成位流判据为准） |
 | `prj/project_6/` | 千兆以太网 UDP 协议栈 | ping 0% 丢包、UDP 回显逐字节一致、Wireshark 抓包核对 | ✅ 2026-09-04 |
 | `prj/project_8/` | Aurora-UDP 桥接 | PC 发 UDP → 穿 Aurora 编解码往返 → payload 逐字节一致 | ✅ 2026-09-18 |
 | `prj/project_9/` | 真实光纤链路全链路 | 光口 A↔B 对接，10MB 文件 100% 到达 + SHA256 一致 | ✅ 2026-09-21 |
-| `prj/project_10/` | DDR4 帧队列（内存进环路） | 仿真六用例全过；真 MIG 综合时序收敛；上板联调待做 | 🔄 开发中 |
+| `prj/project_10/` | DDR4 帧队列（内存进环路） | W3 内存插入上板全过（ping/UDP/10MB 桥零丢零错/七级对账闭合）；过载冻结已修复；W4 两级全环路构建中 | 🔄 开发中 |
 | `prj/project_2/` | 8b/10b 编解码练手（仅起步即跳过，物理层由 IBERT 实验覆盖） | — | ⏸ 封存 |
 | `prj/project_7/` | SFP 光口以太网前端 | — | ⏸ 封存 |
 | `prj/aurora_64b66b_loop_ex/` | Aurora 官方例程 + 串口调试桥 | 例程内环已验证；串口桥验证未完成 | ⏸ 留档 |

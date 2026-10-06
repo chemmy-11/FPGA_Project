@@ -145,9 +145,13 @@ D:\FPGA\prj\project_N\
 | 19 | **XDC/Tcl 行尾 `#` 注释非法 → 那条约束根本没生效** | Tcl 里 **`#` 只在「命令行首」才是注释**；写在命令**行尾**的 `#` 会被当成**多余参数**传给命令 → `[Common 17-165] Too many positional options when parsing ...` **CRITICAL WARNING，命令失败**。prj9 实证：`xdc/aurora_udp_bridge.xdc:92` 的 `set_false_path ... # prj9: 通配符覆盖 _0 与 _1 双核` 未生效（该文件 40 处行首注释均合法，**行尾注释全文件仅此 1 处 ↔ 构建日志恰好 1 条 CRITICAL WARNING**，一一对应）。⇒ **XDC/脚本里注释一律独立成行**；排查「约束怎么没生效」先数 Too many positional options |
 | 20 | `xdc_lint` 对 GT 参考时钟报 `MISSING_IOSTANDARD`（**误报，别照改**） | `gt_refclk_p/n`（T6/T5 = MGTREFCLK1_X1Y2）是 **GT 专用引脚**，不需要也不应写 IOSTANDARD。事实源：官方 GT Wizard 例程 `gtwizard_ultrascale_0_example_top.xdc` L56-57 **同样只写 `package_pin`**（而同文件对 `sys_clk`/`sfp_rs` 等普通 IO 都写了 IOSTANDARD）；prj9 同写法综合日志 **0 条 NSTD-1/BIVC-1**。⇒ 见此类告警**先判端口是否为 GT 专用脚**，是则忽略 |
 | 21 | **vivado-mcp `start_session` 必失败（`RuntimeError: Vivado GUI 进程提前退出`）** | 0.3.26 把「`vivado_mcp_server.tcl` 的路径」写进一个只含 ASCII 的临时 `.tcl`（`D:\FPGA\tmpXXXX.tcl`）交给 `vivado -source`，而 **Vivado 的 Tcl 按系统 ANSI(GBK) 解码该文件** → 安装路径里的「毕设」解成「姣曡??」→ `couldn't read file ... no such file or directory`。与 #1 同根（GBK 码位）。**修法 = 把整个安装搬到纯 ASCII 路径**（2026-10-01 实做：`C:\Users\15266\Desktop\毕设\.mcp-pilot` → `D:\vivado-mcp`，含 venv+site）；`C:` 侧旧路径留转发壳。**注意 mcp 包自身的 `_check_ascii_paths` 已经把非 ASCII 路径列为红线**，但只查 vivado_path 与 cwd，**查不到包安装路径**——所以这条只能靠安装位置保证 |
+| 22 | **SmartConnect / AXI Interconnect 2023.1 均锁 IP Integrator**——独立 Tcl `create_ip` 生成产物为**空壳**（实测 BD 内只有 aclk/aresetn，无任何 AXI 端口）；SC 改全局综合模式（`generate_synth_checkpoint false`）后 wrapper 与内核端口又不一致。**修法 = 自研仲裁器**（`prj_loop/rtl/axi_arb_2to1.v`，事务级轮转 + 单元仿真）；若必须用 IP 互联，只能在 Block Design 内创建（W4 六轮构建实证，2026-10-06/07） | AXI 互联选型：两主一从同域场景自研 ~200 行可控可仿真，比 BD 引入便宜 |
 
 ## 十、当前工程状态（一屏速览；内部详表见本节附录）
 
+- ✅ **D1 DDR4 校准 + W3 内存插入联调全过（2026-10-06，c27eea3/2465cf4）**：双位流校准全绿；集成位流 ping 20/20 + UDP 12/12 + 10MB 桥零丢零错 + 七级对账闭合；一条命令验证 prj_loop/scripts/udp_verify_ddr.py（四档全 PASS）
+- ✅ **过载硬冻结修复落地（2026-10-06 晚，9f29d7c）**：prj_loop/rtl_patch/udp_tx.v 派生副本（忙时锁存 pending，prj9 原件零改动）；R4 TB + 板上重放 pace 13µs 场景双验证，"过载只降速不冻结"达成
+- 🔄 **W4 两级内存全环路（暂停于第七轮构建，2026-10-07）**：桥② EGR + 自研 axi_arb_2to1 仲裁器（IP 互联两选均锁 IPI，见坑账本 #22；仲裁器单元仿真 8:8 轮转 PASS）；恢复点见 vault 待办
 > **README 分工变更（2026-10-01）**：仓库 `README.md` 改为**面向组员/新手的外部门面**（工程血缘图 + 通俗一览 + 快速开始）。原 README 承载的**内部信息**（工程索引详表、docs 文档中心指向、标准开发流程、挂起区触发条件）全部迁入本节附录，内部协作只看 AGENTS.md。
 
 - ✅ prj6 网口栈（09-04）· ✅ prj8 数据级桥 M2 判据全过（09-18，git 66ff43d）

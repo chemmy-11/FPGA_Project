@@ -4,9 +4,13 @@
 //-----------------------------------------------------------------------------
 // 数据流（相对 prj9 的唯一改动 = 拦截"泵A → pack"两根线，中间插入内存桥）:
 //   PC --RJ45(GE1,RGMII)--> [以太网栈] --回显帧--> 帧泵A(CDC)
-//      --> [frame_mem_if: 攒槽/写DDR4/按SEQ读回]     ←←← 本工程新增
+//      --> [内存桥① ING 0x0010_0000: 写DDR4/SEQ读回]                    ←W3
 //      --> axis_word_pack(8→64) --> Aurora A TX --> 光纤 --> B 回显(unpack→pack)
-//      --> 光纤 --> Aurora RX --> unpack(64→8) --> 帧泵B(CDC) --> RGMII TX --> PC
+//      --> 光纤 --> Aurora RX --> unpack(64→8)
+//      --> [内存桥② EGR 0x0020_0000: 写DDR4/SEQ读回]                    ←W4
+//      --> 帧泵B(CDC) --> RGMII TX --> PC
+//   W4: 两级内存全环路(导师语义③④: 光回环后再存内存再读出); AXI 互联 =
+//       SmartConnect 2主1从(S00=桥① S01=桥② M00=MIG, ui_clk 同域)
 //
 // 派生原则（执行单 2026-10-04）：整份复制 prj9 顶层，只改:
 //   1. u_pack 输入: pump_fwd_data/en → mem_rd_data/mem_rd_en（frame_mem_if 读侧）
@@ -595,6 +599,262 @@ frame_mem_if #(.SLOT_BASE(32'h0010_0000), .MAX_LEN(16'd1538)) u_mem (
 );
 
 //*******************************************************************
+// ★ W4 新增: 桥②(EGRESS 0x0020_0000) 声明 + SmartConnect 2主1从
+//*******************************************************************
+    wire [3:0] m2_axi_awid;
+    wire [31:0] m2_axi_awaddr;
+    wire [7:0] m2_axi_awlen;
+    wire [2:0] m2_axi_awsize;
+    wire [1:0] m2_axi_awburst;
+    wire [0:0] m2_axi_awlock;
+    wire [3:0] m2_axi_awcache;
+    wire [2:0] m2_axi_awprot;
+    wire [3:0] m2_axi_awqos;
+    wire [0:0] m2_axi_awvalid;
+    wire [0:0] m2_axi_awready;
+    wire [511:0] m2_axi_wdata;
+    wire [63:0] m2_axi_wstrb;
+    wire [0:0] m2_axi_wlast;
+    wire [0:0] m2_axi_wvalid;
+    wire [0:0] m2_axi_wready;
+    wire [1:0] m2_axi_bresp;
+    wire [0:0] m2_axi_bvalid;
+    wire [0:0] m2_axi_bready;
+    wire [3:0] m2_axi_bid;
+    wire [3:0] m2_axi_arid;
+    wire [31:0] m2_axi_araddr;
+    wire [7:0] m2_axi_arlen;
+    wire [2:0] m2_axi_arsize;
+    wire [1:0] m2_axi_arburst;
+    wire [0:0] m2_axi_arlock;
+    wire [3:0] m2_axi_arcache;
+    wire [2:0] m2_axi_arprot;
+    wire [3:0] m2_axi_arqos;
+    wire [0:0] m2_axi_arvalid;
+    wire [0:0] m2_axi_arready;
+    wire [511:0] m2_axi_rdata;
+    wire [1:0] m2_axi_rresp;
+    wire [0:0] m2_axi_rlast;
+    wire [0:0] m2_axi_rvalid;
+    wire [0:0] m2_axi_rready;
+    wire [3:0] m2_axi_rid;
+    wire [3:0] sc_s_awid;
+    wire [31:0] sc_s_awaddr;
+    wire [7:0] sc_s_awlen;
+    wire [2:0] sc_s_awsize;
+    wire [1:0] sc_s_awburst;
+    wire [0:0] sc_s_awlock;
+    wire [3:0] sc_s_awcache;
+    wire [2:0] sc_s_awprot;
+    wire [3:0] sc_s_awqos;
+    wire [0:0] sc_s_awvalid;
+    wire [0:0] sc_s_awready;
+    wire [511:0] sc_s_wdata;
+    wire [63:0] sc_s_wstrb;
+    wire [0:0] sc_s_wlast;
+    wire [0:0] sc_s_wvalid;
+    wire [0:0] sc_s_wready;
+    wire [1:0] sc_s_bresp;
+    wire [0:0] sc_s_bvalid;
+    wire [0:0] sc_s_bready;
+    wire [3:0] sc_s_bid;
+    wire [3:0] sc_s_arid;
+    wire [31:0] sc_s_araddr;
+    wire [7:0] sc_s_arlen;
+    wire [2:0] sc_s_arsize;
+    wire [1:0] sc_s_arburst;
+    wire [0:0] sc_s_arlock;
+    wire [3:0] sc_s_arcache;
+    wire [2:0] sc_s_arprot;
+    wire [3:0] sc_s_arqos;
+    wire [0:0] sc_s_arvalid;
+    wire [0:0] sc_s_arready;
+    wire [511:0] sc_s_rdata;
+    wire [1:0] sc_s_rresp;
+    wire [0:0] sc_s_rlast;
+    wire [0:0] sc_s_rvalid;
+    wire [0:0] sc_s_rready;
+    wire [3:0] sc_s_rid;
+    wire [7:0]  mem2_rd_data; wire mem2_rd_en;
+    wire [7:0]  mem2_rd_slot_o; wire [15:0] mem2_rd_len_o;
+    wire        mem2_rd_frame_done, mem2_rd_busy;
+    reg         mem2_rd_req = 1'b0;
+    wire        mem2_wr_hold;
+    wire [15:0] mem2_wm, mem2_wr_frame, mem2_wr_stall, mem2_rd_frame;
+    wire [15:0] mem2_ill_rd, mem2_noframe, mem2_bresp_err, mem2_len_err;
+    wire [8:0]  mem2_outstanding;
+    wire [7:0]  mem2_dbg_wr_slot, mem2_dbg_rd_slot;
+    wire [31:0] mem2_dbg_wr_cycles, mem2_dbg_rd_cycles, mem2_dbg_wr_beats, mem2_dbg_rd_beats;
+    wire [15:0] mem2_u_wr_frame, mem2_u_rd_frame, mem2_u_buf_drop;
+    wire [31:0] mem2_u_hold_cycles;
+    wire [8:0]  mem2_outstanding_sync;
+
+    // 桥②读命令自动生成(同桥①: user 域灰码镜像 outstanding, SEQ 透传)
+    always @(posedge user_clk) begin
+        if (aurora_rst) mem2_rd_req <= 1'b0;
+        else            mem2_rd_req <= (mem2_outstanding_sync != 9'd0) && !mem2_rd_busy && !mem2_rd_req;
+    end
+
+frame_mem_if #(.SLOT_BASE(32'h0020_0000), .MAX_LEN(16'd1538)) u_mem2 (
+    // 帧侧 (user_clk)
+    .user_clk(user_clk), .user_rst_n(~aurora_rst),
+    .wr_data (unpack_data  ), .wr_en (unpack_en   ),   // ← W4 回程拦截点: 解包输出
+    .wr_hold (mem2_wr_hold),                            // 悬空: 满时整帧拒收+计数
+    .rd_data (mem2_rd_data), .rd_en (mem2_rd_en),        // → pack（帧中零气泡, 见 PRIME）
+    .rd_slot_o(mem2_rd_slot_o), .rd_len_o(mem2_rd_len_o),
+    .rd_frame_done(mem2_rd_frame_done),
+    .rd_req (mem2_rd_req), .rd_busy (mem2_rd_busy),
+    .cfg_mode(1'b0), .cfg_rd_slot(8'h00),              // SEQ 模式（模拟透传）
+    .ro_u_wr_frame(mem2_u_wr_frame), .ro_u_rd_frame(mem2_u_rd_frame),
+    .ro_u_buf_drop(mem2_u_buf_drop), .ro_u_hold_cycles(mem2_u_hold_cycles),
+    .ro_outstanding_sync(mem2_outstanding_sync),
+    // DDR 侧 (ui_clk)  —— 桥② EGRESS
+    .ui_clk(ui_clk), .ui_rst_n(ui_rst_n), .calib_ok(calib),
+    .ro_wm(mem2_wm), .ro_wr_frame(mem2_wr_frame), .ro_wr_stall(mem2_wr_stall),
+    .ro_rd_frame(mem2_rd_frame), .ro_ill_rd(mem2_ill_rd), .ro_noframe(mem2_noframe),
+    .ro_bresp_err(mem2_bresp_err), .ro_len_err(mem2_len_err),
+    .ro_outstanding(mem2_outstanding),
+    .ro_dbg_wr_slot(mem2_dbg_wr_slot), .ro_dbg_rd_slot(mem2_dbg_rd_slot),
+    .dbg_wr_cycles(mem2_dbg_wr_cycles), .dbg_rd_cycles(mem2_dbg_rd_cycles),
+    .dbg_wr_beats(mem2_dbg_wr_beats), .dbg_rd_beats(mem2_dbg_rd_beats),
+    // AXI4 (ui_clk) → MIG
+    .m_axi_awaddr(m2_axi_awaddr), .m_axi_awlen(m2_axi_awlen), .m_axi_awsize(m2_axi_awsize),
+    .m_axi_awburst(m2_axi_awburst), .m_axi_awvalid(m2_axi_awvalid), .m_axi_awready(m2_axi_awready),
+    .m_axi_wdata(m2_axi_wdata), .m_axi_wstrb(m2_axi_wstrb), .m_axi_wlast(m2_axi_wlast),
+    .m_axi_wvalid(m2_axi_wvalid), .m_axi_wready(m2_axi_wready),
+    .m_axi_bresp(m2_axi_bresp), .m_axi_bvalid(m2_axi_bvalid), .m_axi_bready(m2_axi_bready),
+    .m_axi_araddr(m2_axi_araddr), .m_axi_arlen(m2_axi_arlen), .m_axi_arsize(m2_axi_arsize),
+    .m_axi_arburst(m2_axi_arburst), .m_axi_arvalid(m2_axi_arvalid), .m_axi_arready(m2_axi_arready),
+    .m_axi_rdata(m2_axi_rdata), .m_axi_rresp(m2_axi_rresp), .m_axi_rlast(m2_axi_rlast),
+    .m_axi_rvalid(m2_axi_rvalid), .m_axi_rready(m2_axi_rready),
+    .m_axi_awid(m2_axi_awid), .m_axi_awlock(m2_axi_awlock),
+    .m_axi_awcache(m2_axi_awcache), .m_axi_awprot(m2_axi_awprot),
+    .m_axi_awqos(m2_axi_awqos), .m_axi_bid(m2_axi_bid),
+    .m_axi_arid(m2_axi_arid), .m_axi_arlock(m2_axi_arlock),
+    .m_axi_arcache(m2_axi_arcache), .m_axi_arprot(m2_axi_arprot),
+    .m_axi_arqos(m2_axi_arqos), .m_axi_rid(m2_axi_rid)
+);
+
+    // ---- 自研 AXI 仲裁器(2026-10-06): S00=桥① S01=桥② M=MIG, 事务级轮转 ----
+    //   (SmartConnect/AXI Interconnect 2023.1 均锁 IP Integrator, 实测独立生成产物为空壳)
+    axi_arb_2to1 u_arb (
+        .s00_axi_awid(m_awid),
+        .s00_axi_awaddr(m_awaddr),
+        .s00_axi_awlen(m_awlen),
+        .s00_axi_awsize(m_awsize),
+        .s00_axi_awburst(m_awburst),
+        .s00_axi_awlock(m_awlock),
+        .s00_axi_awcache(m_awcache),
+        .s00_axi_awprot(m_awprot),
+        .s00_axi_awqos(m_awqos),
+        .s00_axi_awvalid(m_awvalid),
+        .s00_axi_awready(m_awready),
+        .s00_axi_wdata(m_wdata),
+        .s00_axi_wstrb(m_wstrb),
+        .s00_axi_wlast(m_wlast),
+        .s00_axi_wvalid(m_wvalid),
+        .s00_axi_wready(m_wready),
+        .s00_axi_bresp(m_bresp),
+        .s00_axi_bvalid(m_bvalid),
+        .s00_axi_bready(m_bready),
+        .s00_axi_bid(m_bid),
+        .s00_axi_arid(m_arid),
+        .s00_axi_araddr(m_araddr),
+        .s00_axi_arlen(m_arlen),
+        .s00_axi_arsize(m_arsize),
+        .s00_axi_arburst(m_arburst),
+        .s00_axi_arlock(m_arlock),
+        .s00_axi_arcache(m_arcache),
+        .s00_axi_arprot(m_arprot),
+        .s00_axi_arqos(m_arqos),
+        .s00_axi_arvalid(m_arvalid),
+        .s00_axi_arready(m_arready),
+        .s00_axi_rdata(m_rdata),
+        .s00_axi_rresp(m_rresp),
+        .s00_axi_rlast(m_rlast),
+        .s00_axi_rvalid(m_rvalid),
+        .s00_axi_rready(m_rready),
+        .s00_axi_rid(m_rid),
+        .s01_axi_awid(m2_axi_awid),
+        .s01_axi_awaddr(m2_axi_awaddr),
+        .s01_axi_awlen(m2_axi_awlen),
+        .s01_axi_awsize(m2_axi_awsize),
+        .s01_axi_awburst(m2_axi_awburst),
+        .s01_axi_awlock(m2_axi_awlock),
+        .s01_axi_awcache(m2_axi_awcache),
+        .s01_axi_awprot(m2_axi_awprot),
+        .s01_axi_awqos(m2_axi_awqos),
+        .s01_axi_awvalid(m2_axi_awvalid),
+        .s01_axi_awready(m2_axi_awready),
+        .s01_axi_wdata(m2_axi_wdata),
+        .s01_axi_wstrb(m2_axi_wstrb),
+        .s01_axi_wlast(m2_axi_wlast),
+        .s01_axi_wvalid(m2_axi_wvalid),
+        .s01_axi_wready(m2_axi_wready),
+        .s01_axi_bresp(m2_axi_bresp),
+        .s01_axi_bvalid(m2_axi_bvalid),
+        .s01_axi_bready(m2_axi_bready),
+        .s01_axi_bid(m2_axi_bid),
+        .s01_axi_arid(m2_axi_arid),
+        .s01_axi_araddr(m2_axi_araddr),
+        .s01_axi_arlen(m2_axi_arlen),
+        .s01_axi_arsize(m2_axi_arsize),
+        .s01_axi_arburst(m2_axi_arburst),
+        .s01_axi_arlock(m2_axi_arlock),
+        .s01_axi_arcache(m2_axi_arcache),
+        .s01_axi_arprot(m2_axi_arprot),
+        .s01_axi_arqos(m2_axi_arqos),
+        .s01_axi_arvalid(m2_axi_arvalid),
+        .s01_axi_arready(m2_axi_arready),
+        .s01_axi_rdata(m2_axi_rdata),
+        .s01_axi_rresp(m2_axi_rresp),
+        .s01_axi_rlast(m2_axi_rlast),
+        .s01_axi_rvalid(m2_axi_rvalid),
+        .s01_axi_rready(m2_axi_rready),
+        .s01_axi_rid(m2_axi_rid),
+        .m_axi_awid(sc_s_awid),
+        .m_axi_awaddr(sc_s_awaddr),
+        .m_axi_awlen(sc_s_awlen),
+        .m_axi_awsize(sc_s_awsize),
+        .m_axi_awburst(sc_s_awburst),
+        .m_axi_awlock(sc_s_awlock),
+        .m_axi_awcache(sc_s_awcache),
+        .m_axi_awprot(sc_s_awprot),
+        .m_axi_awqos(sc_s_awqos),
+        .m_axi_awvalid(sc_s_awvalid),
+        .m_axi_awready(sc_s_awready),
+        .m_axi_wdata(sc_s_wdata),
+        .m_axi_wstrb(sc_s_wstrb),
+        .m_axi_wlast(sc_s_wlast),
+        .m_axi_wvalid(sc_s_wvalid),
+        .m_axi_wready(sc_s_wready),
+        .m_axi_bresp(sc_s_bresp),
+        .m_axi_bvalid(sc_s_bvalid),
+        .m_axi_bready(sc_s_bready),
+        .m_axi_bid(sc_s_bid),
+        .m_axi_arid(sc_s_arid),
+        .m_axi_araddr(sc_s_araddr),
+        .m_axi_arlen(sc_s_arlen),
+        .m_axi_arsize(sc_s_arsize),
+        .m_axi_arburst(sc_s_arburst),
+        .m_axi_arlock(sc_s_arlock),
+        .m_axi_arcache(sc_s_arcache),
+        .m_axi_arprot(sc_s_arprot),
+        .m_axi_arqos(sc_s_arqos),
+        .m_axi_arvalid(sc_s_arvalid),
+        .m_axi_arready(sc_s_arready),
+        .m_axi_rdata(sc_s_rdata),
+        .m_axi_rresp(sc_s_rresp),
+        .m_axi_rlast(sc_s_rlast),
+        .m_axi_rvalid(sc_s_rvalid),
+        .m_axi_rready(sc_s_rready),
+        .m_axi_rid(sc_s_rid),
+        .clk(ui_clk),
+        .rst_n(ui_rst_n)
+    );
+
+
+//*******************************************************************
 // ★ prj10: 真 MIG (ddr4_0) —— 复位取反 + 时钟经顶层 IBUFDS 单端喂入
 //   时钟: System_Clock=No_Buffer(工程内 xci 已改, 不动 prj_uiclk 原件) —— 顶层
 //   唯一的 IBUFDS 输出 init_clk_i 同时喂 Aurora 数字逻辑(经 BUFG)与 MIG MMCM。
@@ -616,28 +876,28 @@ ddr4_0 u_ddr4 (
     .c0_init_calib_complete(calib),
     .c0_ddr4_ui_clk(ui_clk), .c0_ddr4_ui_clk_sync_rst(ui_sync_rst),
     .dbg_clk(), .c0_ddr4_aresetn(ui_rst_n),
-    .c0_ddr4_s_axi_awid(m_awid),
-    .c0_ddr4_s_axi_awaddr(m_awaddr), .c0_ddr4_s_axi_awlen(m_awlen),
-    .c0_ddr4_s_axi_awsize(m_awsize), .c0_ddr4_s_axi_awburst(m_awburst),
-    .c0_ddr4_s_axi_awlock(m_awlock), .c0_ddr4_s_axi_awcache(m_awcache),
-    .c0_ddr4_s_axi_awprot(m_awprot), .c0_ddr4_s_axi_awqos(m_awqos),
-    .c0_ddr4_s_axi_awvalid(m_awvalid), .c0_ddr4_s_axi_awready(m_awready),
-    .c0_ddr4_s_axi_wdata(m_wdata), .c0_ddr4_s_axi_wstrb(m_wstrb),
-    .c0_ddr4_s_axi_wlast(m_wlast), .c0_ddr4_s_axi_wvalid(m_wvalid),
-    .c0_ddr4_s_axi_wready(m_wready),
-    .c0_ddr4_s_axi_bready(m_bready),
-    .c0_ddr4_s_axi_bid(m_bid), .c0_ddr4_s_axi_bresp(m_bresp),
-    .c0_ddr4_s_axi_bvalid(m_bvalid),
-    .c0_ddr4_s_axi_arid(m_arid),
-    .c0_ddr4_s_axi_araddr(m_araddr), .c0_ddr4_s_axi_arlen(m_arlen),
-    .c0_ddr4_s_axi_arsize(m_arsize), .c0_ddr4_s_axi_arburst(m_arburst),
-    .c0_ddr4_s_axi_arlock(m_arlock), .c0_ddr4_s_axi_arcache(m_arcache),
-    .c0_ddr4_s_axi_arprot(m_arprot), .c0_ddr4_s_axi_arqos(m_arqos),
-    .c0_ddr4_s_axi_arvalid(m_arvalid), .c0_ddr4_s_axi_arready(m_arready),
-    .c0_ddr4_s_axi_rready(m_rready),
-    .c0_ddr4_s_axi_rid(m_rid), .c0_ddr4_s_axi_rdata(m_rdata),
-    .c0_ddr4_s_axi_rresp(m_rresp), .c0_ddr4_s_axi_rlast(m_rlast),
-    .c0_ddr4_s_axi_rvalid(m_rvalid),
+    .c0_ddr4_s_axi_awid(sc_s_awid),
+    .c0_ddr4_s_axi_awaddr(sc_s_awaddr), .c0_ddr4_s_axi_awlen(sc_s_awlen),
+    .c0_ddr4_s_axi_awsize(sc_s_awsize), .c0_ddr4_s_axi_awburst(sc_s_awburst),
+    .c0_ddr4_s_axi_awlock(sc_s_awlock), .c0_ddr4_s_axi_awcache(sc_s_awcache),
+    .c0_ddr4_s_axi_awprot(sc_s_awprot), .c0_ddr4_s_axi_awqos(sc_s_awqos),
+    .c0_ddr4_s_axi_awvalid(sc_s_awvalid), .c0_ddr4_s_axi_awready(sc_s_awready),
+    .c0_ddr4_s_axi_wdata(sc_s_wdata), .c0_ddr4_s_axi_wstrb(sc_s_wstrb),
+    .c0_ddr4_s_axi_wlast(sc_s_wlast), .c0_ddr4_s_axi_wvalid(sc_s_wvalid),
+    .c0_ddr4_s_axi_wready(sc_s_wready),
+    .c0_ddr4_s_axi_bready(sc_s_bready),
+    .c0_ddr4_s_axi_bid(sc_s_bid), .c0_ddr4_s_axi_bresp(sc_s_bresp),
+    .c0_ddr4_s_axi_bvalid(sc_s_bvalid),
+    .c0_ddr4_s_axi_arid(sc_s_arid),
+    .c0_ddr4_s_axi_araddr(sc_s_araddr), .c0_ddr4_s_axi_arlen(sc_s_arlen),
+    .c0_ddr4_s_axi_arsize(sc_s_arsize), .c0_ddr4_s_axi_arburst(sc_s_arburst),
+    .c0_ddr4_s_axi_arlock(sc_s_arlock), .c0_ddr4_s_axi_arcache(sc_s_arcache),
+    .c0_ddr4_s_axi_arprot(sc_s_arprot), .c0_ddr4_s_axi_arqos(sc_s_arqos),
+    .c0_ddr4_s_axi_arvalid(sc_s_arvalid), .c0_ddr4_s_axi_arready(sc_s_arready),
+    .c0_ddr4_s_axi_rready(sc_s_rready),
+    .c0_ddr4_s_axi_rid(sc_s_rid), .c0_ddr4_s_axi_rdata(sc_s_rdata),
+    .c0_ddr4_s_axi_rresp(sc_s_rresp), .c0_ddr4_s_axi_rlast(sc_s_rlast),
+    .c0_ddr4_s_axi_rvalid(sc_s_rvalid),
     .dbg_bus(dbg_bus)
 );
 
@@ -683,8 +943,8 @@ axis_word_unpack u_unpack (
 frame_fifo_pump u_pump_rev (
     .wr_clk       (user_clk      ),
     .wr_rst_n     (~aurora_rst   ),
-    .wr_data      (unpack_data   ),
-    .wr_en        (unpack_en     ),
+    .wr_data      (mem2_rd_data  ),   // ★ W4: 原为 unpack_data(回程插桥②)
+    .wr_en        (mem2_rd_en    ),
     .rd_clk       (gmii_rx_clk   ),
     .rd_rst_n     (~aurora_rst   ),
     .rd_data      (pump_rev_data ),
@@ -826,9 +1086,21 @@ end
 (* mark_debug = "true" *) wire [8:0]  dbg_mem_ost     = mem_outstanding;
 (* mark_debug = "true" *) wire [7:0]  dbg_mem_wslot   = mem_dbg_wr_slot;
 (* mark_debug = "true" *) wire [7:0]  dbg_mem_rslot   = mem_dbg_rd_slot;
+// ★ W4: 桥②(EGRESS)观测 —— user/ui 域分挂同桥①纪律
+(* mark_debug = "true" *) wire [15:0] dbg_mem2_wm     = mem2_wm;
+(* mark_debug = "true" *) wire [15:0] dbg_mem2_wr_frm = mem2_wr_frame;
+(* mark_debug = "true" *) wire [15:0] dbg_mem2_rd_frm = mem2_rd_frame;
+(* mark_debug = "true" *) wire [15:0] dbg_mem2_stall  = mem2_wr_stall;
+(* mark_debug = "true" *) wire [15:0] dbg_mem2_len    = mem2_len_err;
+(* mark_debug = "true" *) wire [8:0]  dbg_mem2_ost    = mem2_outstanding;
+(* mark_debug = "true" *) wire [15:0] dbg_mem2_u_wr   = mem2_u_wr_frame;
+(* mark_debug = "true" *) wire [15:0] dbg_mem2_u_rd   = mem2_u_rd_frame;
 
 // 未观测信号聚合（防剪枝告警; 数值不使用）
 wire unused = ^{mem_rd_slot_o, mem_rd_len_o, mem_rd_frame_done, mem_wr_hold,
+                mem2_rd_slot_o, mem2_rd_len_o, mem2_rd_frame_done, mem2_wr_hold,
+                mem2_ill_rd, mem2_noframe, mem2_dbg_wr_cycles, mem2_dbg_rd_cycles,
+                mem2_dbg_wr_beats, mem2_dbg_rd_beats, mem2_u_hold_cycles,
                 mem_ill_rd, mem_noframe, dbg_bus,
                 mem_dbg_wr_cycles, mem_dbg_rd_cycles, mem_dbg_wr_beats, mem_dbg_rd_beats,
                 mem_u_hold_cycles, sync_clk, tx_out_clk, gt_pll_lock, gt_pll_lock_b,

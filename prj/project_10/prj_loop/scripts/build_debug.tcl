@@ -86,6 +86,9 @@ foreach n [bus_nets dbg_mem_u_rd   16] { lappend nets0 $n }
 foreach n [bus_nets dbg_mem_u_drop 16] { lappend nets0 $n }
 lappend nets0 [one_net dbg_mem_rden]
 foreach n [bus_nets dbg_mem_ost_s   9] { lappend nets0 $n }
+# ---- W4: 桥② user 域观测 ----
+foreach n [bus_nets dbg_mem2_u_wr  16] { lappend nets0 $n }
+foreach n [bus_nets dbg_mem2_u_rd  16] { lappend nets0 $n }
 set_property port_width [llength $nets0] [get_debug_ports u_ila_0/probe0]
 connect_debug_port u_ila_0/probe0 $nets0
 
@@ -185,6 +188,11 @@ foreach n [bus_nets dbg_mem_bresp   16] { lappend nets3 $n }
 foreach n [bus_nets dbg_mem_ost      9] { lappend nets3 $n }
 foreach n [bus_nets dbg_mem_wslot    8] { lappend nets3 $n }
 foreach n [bus_nets dbg_mem_rslot    8] { lappend nets3 $n }
+# ---- W4: 桥②(EGRESS) ui 域观测 ----
+foreach n [bus_nets dbg_mem2_wm     16] { lappend nets3 $n }
+foreach n [bus_nets dbg_mem2_wr_frm 16] { lappend nets3 $n }
+foreach n [bus_nets dbg_mem2_rd_frm 16] { lappend nets3 $n }
+foreach n [bus_nets dbg_mem2_ost     9] { lappend nets3 $n }
 set_property port_width [llength $nets3] [get_debug_ports u_ila_3/probe0]
 connect_debug_port u_ila_3/probe0 $nets3
 
