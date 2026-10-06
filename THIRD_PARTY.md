@@ -1,8 +1,8 @@
 # 第三方组件与素材声明
 
 > 本文件列明本仓库中**不属于作者原创**的内容及其权利归属。
-> 根目录 [`LICENSE`](LICENSE)（Apache-2.0）**仅覆盖作者原创部分**；下列内容**不适用**该许可，各自遵循其原始条款。
-> 本文件同时充当 Apache-2.0 第 4(d) 条所指的 **NOTICE**。
+> 根目录 [`LICENSE`](LICENSE)（MIT）**仅覆盖作者原创部分**；下列内容**不适用**该许可，各自遵循其原始条款。
+> 本文件为第三方组件与版权素材声明（NOTICE 性质）。
 
 ## 一、随仓库分发的第三方软件
 
@@ -10,7 +10,7 @@
 |---|---|---|---|
 | **vivado-mcp** | `vivado-mcp/` | **Apache-2.0** | 上游 [mapleleavessssssss-wq/vivado-mcp](https://github.com/mapleleavessssssss-wq/vivado-mcp) **v0.3.26**。本仓库副本为**零代码改动的目录重组**（逐字节比对 52 文件相同 / 0 修改），许可证全文见 [`vivado-mcp/LICENSE`](vivado-mcp/LICENSE) |
 
-## 二、AMD / Xilinx 版权素材（**不适用本仓库 Apache-2.0**）
+## 二、AMD / Xilinx 版权素材（**不适用本仓库 MIT**）
 
 本仓库是 FPGA 工程，相当一部分文件**由 AMD/Xilinx 官方例程与 Vivado IP 生成**，版权归 AMD/Xilinx：
 
@@ -26,7 +26,7 @@
 **权利归 AMD/Xilinx**，系随官方例程库与 Vivado IP 目录分发而来，仅供本课题学习与研究使用。
 本仓库**不对其授予任何许可，亦不主张任何权利**；如需商用或再分发，请自行向 AMD 确认条款。
 
-## 三、来源未考证的参考设计（**不适用本仓库 Apache-2.0**）
+## 三、来源未考证的参考设计（**不适用本仓库 MIT**）
 
 | 范围 | 位置 | 说明 |
 |---|---|---|
@@ -35,7 +35,7 @@
 ## 四、作者原创部分
 
 除上述范围外，本仓库的自研 RTL、脚本、文档、评测工具与工具链封装等均为作者原创，
-按根目录 [`LICENSE`](LICENSE)（**Apache License 2.0**）授权。
+按根目录 [`LICENSE`](LICENSE)（**MIT License**，仅供学习研究使用）授权。
 
 ---
 

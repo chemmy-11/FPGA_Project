@@ -2,7 +2,7 @@
 
 [![Vivado](https://img.shields.io/badge/Vivado-2023.1-e8590c?style=flat)](scripts/)
 [![FPGA](https://img.shields.io/badge/FPGA-XCKU060-0b7285?style=flat)](prj/)
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue?style=flat)](LICENSE)
+[![License](https://img.shields.io/badge/license-MIT-blue?style=flat)](LICENSE)
 [![CI](https://github.com/chemmy-11/FPGA_Project/actions/workflows/ci.yml/badge.svg)](https://github.com/chemmy-11/FPGA_Project/actions/workflows/ci.yml)
 
 基于正点原子 KU060 开发板（Kintex UltraScale `xcku060-ffva1156-2-i`）搭建的多节点数据交换平台：
@@ -192,8 +192,8 @@ docs/                   文档中心：实操单、实施单、测试报告、�
 docs/images/            本 README 引用的拓扑图
 vivado-mcp/             配套工具：让 AI 直接操作 Vivado 的 MCP 服务（见下节）
 AGENTS.md               工程规范：事实源优先级、硬件事实卡、CDC/ILA/XDC 约定、坑账本
-LICENSE                 Apache-2.0（覆盖作者原创部分）
-THIRD_PARTY.md          第三方组件与素材声明（含 AMD/Xilinx 版权素材，不适用 Apache-2.0）
+LICENSE                 MIT（覆盖作者原创部分）
+THIRD_PARTY.md          第三方组件与素材声明（含 AMD/Xilinx 版权素材，不适用 MIT）
 KU_IO.xdc               官方板卡引脚约束（事实基准）
 scripts/                顶层 Tcl 骨架（建工程 / 构建 / 烧录）+ ci_check.py（仓库体检）
 .github/workflows/      CI：文档规范 / 相对链接 / 脚本语法自动检查
@@ -227,8 +227,9 @@ scripts/                顶层 Tcl 骨架（建工程 / 构建 / 烧录）+ ci_c
 
 ---
 
-**许可**：本仓库**作者原创部分**（自研 RTL、脚本、文档、评测与工具链封装）采用 **[Apache License 2.0](LICENSE)**。
-**例外**（详见 [`THIRD_PARTY.md`](THIRD_PARTY.md)，该文件同时充当 Apache-2.0 所指的 NOTICE）：
-- **AMD / Xilinx 版权素材**——`prj/aurora_64b66b_loop_ex/`、`prj/ibert_ultrascale_gth_0/`、各工程的官方例程移植件与 IP 生成物、`KU_IO.xdc` 等：**不适用** Apache-2.0，权利归 AMD/Xilinx，仅供学习研究；
+**许可**：本仓库**作者原创部分**（自研 RTL、脚本、文档、评测与工具链封装）采用 **[MIT License](LICENSE)**，**仅供学习研究使用**。
+**例外**（详见 [`THIRD_PARTY.md`](THIRD_PARTY.md)，第三方与版权素材声明）：
+- **AMD / Xilinx 版权素材**——`prj/aurora_64b66b_loop_ex/`、`prj/ibert_ultrascale_gth_0/`、各工程的官方例程移植件与 IP 生成物、`KU_IO.xdc` 等：**不适用** MIT，权利归 AMD/Xilinx，仅供学习研究；
 - [`vivado-mcp/`](vivado-mcp/)——第三方项目，遵循其上游 Apache-2.0（全文见 [`vivado-mcp/LICENSE`](vivado-mcp/LICENSE)）；
+- **Vivado 许可文件**——`*.lic` 已被 `.gitignore` 排除，不入库不分发；本仓库不复制、不传播任何 AMD/Xilinx 工具授权；
 - `prj/0DMA_uart2ddr/`——来源未考证的参考设计，**不主张权利、不授予许可**。

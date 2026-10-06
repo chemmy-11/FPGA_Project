@@ -180,7 +180,7 @@ D:\FPGA\prj\project_N\
 
 **⏸️ 挂起（恢复触发条件见 vault `操作文档/挂起/README`）**：串口桥 M-D 三级验证（解 dbg 探针时钟域 undefined + AE33 输入方向）· `prj/project_7/` SFP 前端内环（09-22 定案后不再复活，PCS/PMA 配置留档）· 8b/10b 练手（IBERT 已覆盖）· prj9 传输效率深挖 B 组（B1 板卡自发流/B2 C 发包器/B3 帧泵 B 硬件提速；E1–E5 已随实操单 v2 移回主线）。
 
-**🗄️ 归档/工具**：`prj/project_2/` 8b/10b 练手遗骸 · `prj/project_3/` Aurora IP 定版 xci · `prj/0DMA_uart2ddr/`（MicroBlaze+MIG+DMA+UART 参考 BD，Vivado **2019.2**，**未验证勿当资产**，D2/D5 骨架）· `scripts/` 顶层 Tcl 骨架 + `ci_check.py` · `KU_IO.xdc` + `docs/KU引脚表.xlsx`（GBK）· `docs/参考_cross_FMC_4SFP_GTH引脚表_2026-08-27.md` · **`vivado-mcp/`**（上游 [vivado-mcp](https://github.com/mapleleavessssssss-wq/vivado-mcp) v0.3.26 **零改动副本**，Apache-2.0；权利边界与 NOTICE 见根 `THIRD_PARTY.md`；运行时实装在 `D:\vivado-mcp`，见坑账本 #21，仓库内副本仅溯源）· **CI**：`.github/workflows/ci.yml`（push 触发 `scripts/ci_check.py` 仓库体检：文档规范/链接/Tcl 语法；本地收尾可先 `python scripts/ci_check.py`）· 根 `LICENSE`（Apache-2.0，**仅覆盖作者原创部分**）。
+**🗄️ 归档/工具**：`prj/project_2/` 8b/10b 练手遗骸 · `prj/project_3/` Aurora IP 定版 xci · `prj/0DMA_uart2ddr/`（MicroBlaze+MIG+DMA+UART 参考 BD，Vivado **2019.2**，**未验证勿当资产**，D2/D5 骨架）· `scripts/` 顶层 Tcl 骨架 + `ci_check.py` · `KU_IO.xdc` + `docs/KU引脚表.xlsx`（GBK）· `docs/参考_cross_FMC_4SFP_GTH引脚表_2026-08-27.md` · **`vivado-mcp/`**（上游 [vivado-mcp](https://github.com/mapleleavessssssss-wq/vivado-mcp) v0.3.26 **零改动副本**，Apache-2.0；权利边界与 NOTICE 见根 `THIRD_PARTY.md`；运行时实装在 `D:\vivado-mcp`，见坑账本 #21，仓库内副本仅溯源）· **CI**：`.github/workflows/ci.yml`（push 触发 `scripts/ci_check.py` 仓库体检：文档规范/链接/Tcl 语法；本地收尾可先 `python scripts/ci_check.py`）· 根 `LICENSE`（MIT，**仅覆盖作者原创部分**）。
 
 ### 附 B · docs/ 文档中心指向（原 README 迁入）
 
