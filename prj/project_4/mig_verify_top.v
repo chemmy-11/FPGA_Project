@@ -56,7 +56,10 @@ module mig_verify_top (
     // write channel: continuous data/last from beat counter
     assign s_axi_wvalid_o = (state==S_WR_DATA);
     assign s_axi_wdata_o  = {64{wbeat}};
-    assign s_axi_wlast_o  = (state==S_WR_DATA) && (wbeat==8'd255);
+    // ★ 2026-10-06 修复: 256 拍突发(awlen=255, 16KB)从地址 0 跨 4KB 边界 3 次
+    //   = AXI4 违规 -> MIG 行为未定义, 实测 err_cnt=255/256 几乎全错。
+    //   降为 64 拍(awlen=63, 4KB)恰好不跨界; 写读比对判据语义不变。
+    assign s_axi_wlast_o  = (state==S_WR_DATA) && (wbeat==8'd63);
 
     // ------------------------------------------------------------------
     // FSM
@@ -78,9 +81,9 @@ module mig_verify_top (
                     state     <= S_WR_DATA;
                 end
             end
-            // ---- write data: 256 beats then wait response ----
+            // ---- write data: 64 beats then wait response (awlen=63, 4KB, 见 wlast 修复注) ----
             S_WR_DATA: if (s_axi_wvalid_o && wready_i) begin
-                if (wbeat==8'd255) begin
+                if (wbeat==8'd63) begin
                     bready_r <= 1'b1;
                     state    <= S_WR_RESP;
                 end else begin
@@ -140,8 +143,8 @@ module mig_verify_top (
     assign bready_i  = bready_r;
     assign awaddr_i  = 32'h0;
     assign araddr_i  = 32'h0;
-    assign awlen_i   = 8'd255;
-    assign arlen_i   = 8'd255;
+    assign awlen_i   = 8'd63;        // 64 拍(4KB)不跨 AXI4 4KB 边界(见 wlast 修复注)
+    assign arlen_i   = 8'd63;
     assign awsize_i  = 3'b110;      // 64 bytes/beat (512-bit)
     assign arsize_i  = 3'b110;
     assign awburst_i = 2'b01;       // INCR
@@ -172,6 +175,9 @@ module mig_verify_top (
     wire [7:0]  probe_rbeat = rbeat;
     wire [5:0]  probe_flags = {test_done, test_pass, c0_init_calib_complete,
                                bresp_bad, rresp_bad, rvalid_i};
+    // ★ 2026-10-06 诊断加探: err=N-1 结构性错位(前2拍对/其后全错), 需看读回数据本体
+    wire [255:0] probe_rdata = rdata_i[255:0];            // 读回前 32 字节(4x64B 段, 看 01/00 交替是段内还是段间)
+    wire [3:0]  probe_hs    = {rvalid_i, rlast_i, wready_i, awready_i};
 
     ila_mig u_ila (
         .clk    (c0_ddr4_ui_clk),
@@ -179,7 +185,9 @@ module mig_verify_top (
         .probe1 (probe_err),
         .probe2 (probe_wbeat),
         .probe3 (probe_rbeat),
-        .probe4 (probe_flags)
+        .probe4 (probe_flags),
+        .probe5 (probe_rdata),
+        .probe6 (probe_hs)
     );
 
     // ------------------------------------------------------------------
