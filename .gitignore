@@ -24,8 +24,10 @@ prj/project_1/project_1.srcs/utils_1/
 # ===== 废弃测试工程（勿入仓库）=====
 /test/
 
-# ===== 敏感文件：License 含授权信息，禁止提交 =====
-Xilinx_license_backup.lic
+# ===== 敏感文件：License 含授权信息，禁止提交（2026-10-06 起改全通配）=====
+# 起因：xilinx_ise_vivado.lic 曾以「未跟踪」状态躺在仓库根目录，一次 git add -A 就会误入库。
+# 许可文件与具体机器绑定、不可分发，一律不入库；此处不再逐个点名。
+*.lic
 
 # ===== 仿真网表（IP 生成物，可再生）=====
 *_sim_netlist.v
