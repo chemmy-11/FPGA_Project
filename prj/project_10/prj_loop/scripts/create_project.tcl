@@ -15,6 +15,10 @@ create_project prj_loop $P/vivado -part $part_name -force
 
 ## ---- 光链路源(prj9, 只读): 官方栈 + 帧泵 + 打包/解包 + 双笼 ----
 add_files -fileset sources_1 [glob $P9/rtl/*.v $P9/rtl/*/*.v]
+## ---- prj10 过载冻结修复(2026-10-06): udp_tx 换派生副本(prj9 原件不动) ----
+##   案A 忙时锁存 pending start; R4 TB 验证: 忙态帧正确补发/FIFO 清零/零错位
+remove_files -quiet [get_files -quiet $P9/rtl/udp/udp_tx.v]
+add_files -fileset sources_1 $P/rtl_patch/udp_tx.v
 add_files -fileset sources_1 [glob $P9/shared_logic/*.v]
 
 ## ---- prj10: 内存桥三层 + 派生顶层(不含 w3_uiclk_top —— 那是前置工程专用顶层) ----
