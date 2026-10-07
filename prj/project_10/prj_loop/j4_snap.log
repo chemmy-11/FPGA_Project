@@ -1,0 +1,54 @@
+#-----------------------------------------------------------
+# Vivado v2023.1 (64-bit)
+# SW Build 3865809 on Sun May  7 15:05:29 MDT 2023
+# IP Build 3864474 on Sun May  7 20:36:21 MDT 2023
+# SharedData Build 3865790 on Sun May 07 13:33:03 MDT 2023
+# Start of session at: Wed Oct  7 18:54:13 2026
+# Process ID: 15472
+# Current directory: D:/FPGA/prj/project_10/prj_loop
+# Command line: vivado.exe -mode batch -source scripts\ila_snap.tcl -notrace -log j4_snap.log -journal j4_snap.jou
+# Log file: D:/FPGA/prj/project_10/prj_loop/j4_snap.log
+# Journal file: D:/FPGA/prj/project_10/prj_loop\j4_snap.jou
+# Running On: Xuegulin, OS: Windows, CPU Frequency: 2419 MHz, CPU Physical cores: 16, Host memory: 16890 MB
+#-----------------------------------------------------------
+source {scripts\ila_snap.tcl} -notrace
+SNAP_DIR: D:/FPGA/prj/project_10/prj_loop/out/j4_snap_20261007_185416
+INFO: [Labtools 27-2285] Connecting to hw_server url TCP:localhost:3121
+INFO: [Labtools 27-2222] Launching hw_server...
+INFO: [Labtools 27-2221] Launch Output:
+
+****** Xilinx hw_server v2023.1
+  **** Build date : May  7 2023 at 15:26:57
+    ** Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.
+
+
+INFO: [Labtools 27-3415] Connecting to cs_server url TCP:localhost:0
+INFO: [Labtools 27-3417] Launching cs_server...
+INFO: [Labtools 27-2221] Launch Output:
+
+
+******** Xilinx cs_server v2023.1.0
+  ****** Build date   : Apr 10 2023-23:59:24
+    **** Build number : 2023.1.1681142364
+      ** Copyright 2017-2022 Xilinx, Inc. All Rights Reserved.
+      ** Copyright 2022-2026 Advanced Micro Devices, Inc. All Rights Reserved.
+
+
+
+INFO: [Labtoolstcl 44-466] Opening hw_target localhost:3121/xilinx_tcf/Digilent/210512180081
+INFO: [Labtools 27-2302] Device xcku060 (JTAG device index = 0) is programmed with a design that has 4 ILA core(s).
+INFO: [Labtools 27-2302] Device xcku060 (JTAG device index = 0) is programmed with a design that has 1 MIG core(s).
+INFO: [Labtools 27-1964] The ILA core 'hw_ila_1' trigger was armed at 2026-Oct-07 18:54:26
+INFO: [Labtools 27-1966] The ILA core 'hw_ila_1' triggered at 2026-Oct-07 18:54:26
+SNAP_OK ila0 (hw_ila_1)
+INFO: [Labtools 27-1964] The ILA core 'hw_ila_2' trigger was armed at 2026-Oct-07 18:54:27
+INFO: [Labtools 27-1966] The ILA core 'hw_ila_2' triggered at 2026-Oct-07 18:54:27
+SNAP_OK ila1 (hw_ila_2)
+INFO: [Labtools 27-1964] The ILA core 'hw_ila_3' trigger was armed at 2026-Oct-07 18:54:28
+INFO: [Labtools 27-1966] The ILA core 'hw_ila_3' triggered at 2026-Oct-07 18:54:28
+SNAP_OK ila2 (hw_ila_3)
+INFO: [Labtools 27-1964] The ILA core 'hw_ila_4' trigger was armed at 2026-Oct-07 18:54:28
+INFO: [Labtools 27-1966] The ILA core 'hw_ila_4' triggered at 2026-Oct-07 18:54:28
+SNAP_OK ila3 (hw_ila_4)
+J4_SNAP_DONE: D:/FPGA/prj/project_10/prj_loop/out/j4_snap_20261007_185416  (期望 4 �? ila*.csv; 判�??: mem_*/mem2_* 双桥 wr=rd=wm 且错�?计数兡� 0)
+INFO: [Common 17-206] Exiting Vivado at Wed Oct  7 18:54:29 2026...

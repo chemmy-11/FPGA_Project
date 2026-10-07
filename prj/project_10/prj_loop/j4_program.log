@@ -1,0 +1,57 @@
+#-----------------------------------------------------------
+# Vivado v2023.1 (64-bit)
+# SW Build 3865809 on Sun May  7 15:05:29 MDT 2023
+# IP Build 3864474 on Sun May  7 20:36:21 MDT 2023
+# SharedData Build 3865790 on Sun May 07 13:33:03 MDT 2023
+# Start of session at: Wed Oct  7 18:52:59 2026
+# Process ID: 34188
+# Current directory: D:/FPGA/prj/project_10/prj_loop
+# Command line: vivado.exe -mode batch -source scripts\program_loop.tcl -notrace -log j4_program.log -journal j4_program.jou
+# Log file: D:/FPGA/prj/project_10/prj_loop/j4_program.log
+# Journal file: D:/FPGA/prj/project_10/prj_loop\j4_program.jou
+# Running On: Xuegulin, OS: Windows, CPU Frequency: 2419 MHz, CPU Physical cores: 16, Host memory: 16890 MB
+#-----------------------------------------------------------
+source {scripts\program_loop.tcl} -notrace
+INFO: [Labtools 27-2285] Connecting to hw_server url TCP:localhost:3121
+INFO: [Labtools 27-2222] Launching hw_server...
+INFO: [Labtools 27-2221] Launch Output:
+
+****** Xilinx hw_server v2023.1
+  **** Build date : May  7 2023 at 15:26:57
+    ** Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.
+
+
+INFO: [Labtools 27-3415] Connecting to cs_server url TCP:localhost:0
+INFO: [Labtools 27-3417] Launching cs_server...
+INFO: [Labtools 27-2221] Launch Output:
+
+
+******** Xilinx cs_server v2023.1.0
+  ****** Build date   : Apr 10 2023-23:59:24
+    **** Build number : 2023.1.1681142364
+      ** Copyright 2017-2022 Xilinx, Inc. All Rights Reserved.
+      ** Copyright 2022-2026 Advanced Micro Devices, Inc. All Rights Reserved.
+
+
+
+connect_hw_server: Time (s): cpu = 00:00:00 ; elapsed = 00:00:08 . Memory (MB): peak = 1494.016 ; gain = 24.840
+INFO: [Labtoolstcl 44-466] Opening hw_target localhost:3121/xilinx_tcf/Digilent/210512180081
+DEVICE = xcku060_0  part = xcku060
+INFO: [Labtools 27-3164] End of startup status: HIGH
+program_hw_devices: Time (s): cpu = 00:00:08 ; elapsed = 00:00:07 . Memory (MB): peak = 1496.297 ; gain = 0.000
+PROGRAM_OK: D:/FPGA/prj/project_10/prj_loop/out/aurora_mem_bridge.bit
+INFO: [Labtools 27-2302] Device xcku060 (JTAG device index = 0) is programmed with a design that has 4 ILA core(s).
+INFO: [Labtools 27-2302] Device xcku060 (JTAG device index = 0) is programmed with a design that has 1 MIG core(s).
+==============================================
+调试核数�? = 4  （期�? 4：user / eth / user_b / ui 四域�?
+INFO: [Labtools 27-1964] The ILA core 'hw_ila_1' trigger was armed at 2026-Oct-07 18:53:34
+  hw_ila_1 (u_ila_0): 时钟在跑
+INFO: [Labtools 27-1964] The ILA core 'hw_ila_2' trigger was armed at 2026-Oct-07 18:53:34
+  hw_ila_2 (u_ila_1): 时钟在跑
+INFO: [Labtools 27-1964] The ILA core 'hw_ila_3' trigger was armed at 2026-Oct-07 18:53:34
+  hw_ila_3 (u_ila_2): 时钟在跑
+INFO: [Labtools 27-1964] The ILA core 'hw_ila_4' trigger was armed at 2026-Oct-07 18:53:34
+  hw_ila_4 (u_ila_3): 时钟在跑
+PROGRAM_CHECK_DONE
+下一步：�? T23（链�?）与 T22（内存校准）；然�? ping + udp_verify�?
+INFO: [Common 17-206] Exiting Vivado at Wed Oct  7 18:53:34 2026...
