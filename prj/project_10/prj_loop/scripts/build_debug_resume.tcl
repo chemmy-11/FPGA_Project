@@ -189,10 +189,11 @@ implement_debug_core
 write_debug_probes -force $proj/scripts/probes.ltx
 
 opt_design
-place_design
-phys_opt_design
-route_design
-phys_opt_design
+# W5(2026-10-08): 与 build_debug.tcl 同步——W4 实测最优配方 + WNS 门限
+place_design       -directive ExtraTimingOpt
+phys_opt_design    -directive AggressiveExplore
+route_design       -directive NoTimingRelaxation
+phys_opt_design    -directive AggressiveExplore
 
 report_clocks            -file $proj/out/rpt_clocks.rpt
 report_timing_summary -delay_type min_max -report_unconstrained -check_timing_verbose \
@@ -200,7 +201,17 @@ report_timing_summary -delay_type min_max -report_unconstrained -check_timing_ve
 report_timing -max_paths 25 -sort_by slack -file $proj/out/rpt_timing_worst.rpt
 puts "TIMING: [get_property SLACK [get_timing_paths -max_paths 1 -sort_by slack]]"
 
-write_checkpoint -force $proj/scripts/post_route.dcp
-write_bitstream -force $proj/out/aurora_mem_bridge.bit
-
-puts "DBG_BUILD_DONE: bit=$proj/out/aurora_mem_bridge.bit ltx=$proj/scripts/probes.ltx"
+# W5(2026-10-08): WNS 门限 —— 不达标不写位流
+set wnsr [get_property SLACK [get_timing_paths -max_paths 1 -sort_by slack]]
+set whsr [get_property SLACK [get_timing_paths -delay_type min -max_paths 1 -sort_by slack]]
+puts "WNS_GATE: $wnsr"
+puts "WHS_GATE: $whsr"
+if {$wnsr >= 0 && $whsr >= 0} {
+    write_checkpoint -force $proj/scripts/post_route.dcp
+    write_debug_probes -force $proj/scripts/probes.ltx
+    write_bitstream -force $proj/out/aurora_mem_bridge.bit
+    puts "DBG_BUILD_DONE: bit=$proj/out/aurora_mem_bridge.bit ltx=$proj/scripts/probes.ltx"
+    puts "W5_BUILD_OK"
+} else {
+    puts "W5_BUILD_TIMING_FAIL: wns=$wnsr whs=$whsr (未写位流)"
+}

@@ -222,11 +222,12 @@ implement_debug_core
 write_debug_probes -force $proj/scripts/probes.ltx
 
 # ============ 同会话手动实现（调试核已入网表）============
+# W5(2026-10-07): 默认配方在 RND 活化后不收敛(-1.142), 换 W4 实测最优组合
 opt_design
-place_design
-phys_opt_design
-route_design
-phys_opt_design
+place_design       -directive ExtraTimingOpt
+phys_opt_design    -directive AggressiveExplore
+route_design       -directive NoTimingRelaxation
+phys_opt_design    -directive AggressiveExplore
 
 report_clocks            -file $proj/out/rpt_clocks.rpt
 report_timing_summary -delay_type min_max -report_unconstrained -check_timing_verbose \
@@ -234,7 +235,17 @@ report_timing_summary -delay_type min_max -report_unconstrained -check_timing_ve
 report_timing -max_paths 25 -sort_by slack -file $proj/out/rpt_timing_worst.rpt
 puts "TIMING: [get_property SLACK [get_timing_paths -max_paths 1 -sort_by slack]]"
 
-write_checkpoint -force $proj/scripts/post_route.dcp
-write_bitstream -force $proj/out/aurora_mem_bridge.bit
-
-puts "DBG_BUILD_DONE: bit=$proj/out/aurora_mem_bridge.bit ltx=$proj/scripts/probes.ltx"
+# W5(2026-10-07): WNS 门限 —— 不达标不写位流（W4 构建纪律: 未收敛位流不得上板）
+set wns5 [get_property SLACK [get_timing_paths -max_paths 1 -sort_by slack]]
+set whs5 [get_property SLACK [get_timing_paths -delay_type min -max_paths 1 -sort_by slack]]
+puts "WNS_GATE: $wns5"
+puts "WHS_GATE: $whs5"
+if {$wns5 >= 0 && $whs5 >= 0} {
+    write_checkpoint -force $proj/scripts/post_route.dcp
+    write_debug_probes -force $proj/scripts/probes.ltx
+    write_bitstream -force $proj/out/aurora_mem_bridge.bit
+    puts "DBG_BUILD_DONE: bit=$proj/out/aurora_mem_bridge.bit ltx=$proj/scripts/probes.ltx"
+    puts "W5_BUILD_OK"
+} else {
+    puts "W5_BUILD_TIMING_FAIL: wns=$wns5 whs=$whs5 (未写位流)"
+}

@@ -396,7 +396,7 @@ module axi4_master_bridge #(
     // 4. read FSM
     //=========================================================================
     localparam R_IDLE=3'd0, R_AR=3'd1, R_R=3'd2, R_UNPACK=3'd3, R_FIN=3'd4,
-               R_PRE=3'd5;   // R_PRE2 removed: triggered a Vivado 2023.1 synth crash (3x reproducible)
+               R_PRE=3'd5, R_PRE2=3'd6;
 
     reg [2:0]   rstate;
     reg [7:0]   r_slot, r_beat, r_bi, r_beats;
@@ -417,13 +417,8 @@ module axi4_master_bridge #(
     reg         pre_rnd;
     reg [7:0]   pre_slot;
     reg         pre_seq;             // 1 = this prefetched cmd is SEQ
-    // NOTE (2026-10-08): a second cut (state R_PRE2 registering the range
-    // decision before the table lookup) was implemented and measured, but
-    // Vivado 2023.1 synthesis CRASHED on it (EXCEPTION_ACCESS_VIOLATION, 3x
-    // reproducible at "Mimic Skeleton from Reference") while single-module
-    // out-of-context synthesis of the same file passed. It was reverted; the
-    // dead registers are removed. See
-    // 调试记录/阶段三_prj10_W5时序收敛_第二轮根因重定与修复_2026-10-08.md
+    reg [7:0]   pre2_eff;            // W5 cut-2: registered effective slot
+    reg         pre2_in_rng;         // W5 cut-2: registered range decision
 
     wire        cmd_rnd    = rc_data[8];
     wire [7:0]  cmd_slot   = rc_data[7:0];
@@ -431,8 +426,8 @@ module axi4_master_bridge #(
     wire [7:0]  p_clamp    = (stat_wm == 16'd0) ? 8'd0 : (stat_wm[7:0] - 8'd1);
     wire        p_in_rng   = (stat_wm >= 16'd256) || (pre_slot < stat_wm[7:0]);
     wire [7:0]  p_eff      = pre_seq ? rd_seq_slot : (p_in_rng ? pre_slot : p_clamp);
-    // target check: index p_eff is built from REGISTERS (pre_slot/rd_seq_slot/stat_wm)
-    wire        p_target_ok  = (stat_wm != 16'd0) && full_bit[p_eff];
+    // beat 2 (R_PRE2): table lookups + target check, all indices are REGISTERS
+    wire        p2_target_ok = (stat_wm != 16'd0) && full_bit[pre2_eff];
     // SEQ = "oldest unread slot". The pointer is scanned forward until it lands on
     // a FULL slot, so SEQ stays correct even if RND reads have already retired
     // arbitrary slots (mixed-mode safety, see the W2 note 6.3).
@@ -460,6 +455,7 @@ module axi4_master_bridge #(
             r_slot <= 0; r_beat <= 0; r_bi <= 0; r_beats <= 0; r_len <= 0;
             r_beat_data <= 0; r_rnd <= 0;
             pre_rnd <= 1'b0; pre_slot <= 8'd0; pre_seq <= 1'b0;
+            pre2_eff <= 8'd0; pre2_in_rng <= 1'b0;
             rd_retire <= 0; rd_retire_slot <= 0; rd_seq_slot <= 0;
             stat_rd_frame <= 0; stat_ill_rd <= 0; stat_noframe <= 0; dbg_rd_slot <= 0;
             dbg_rd_cycles <= 0; dbg_rd_beats <= 0; out_dec <= 1'b0;
@@ -489,26 +485,35 @@ module axi4_master_bridge #(
                 end
             end
             //-----------------------------------------------------------------
-            // W5 cut-1: decision beat. Range math (compare + select) and the
-            // table lookups share this beat -- measured WNS -0.494 @3.333ns, i.e.
-            // one more cut is still needed. All inputs here are REGISTERS
-            // (pre_rnd/pre_slot/rd_seq_slot/stat_wm), never the FWFT RAM output.
+            // W5 cut-1: range math beat. Compare + select ONLY (no table lookup):
+            // stat_wm/pre_slot/rd_seq_slot are registers, so this beat is short.
+            // Results are registered so cut-2 starts its table lookup from a reg.
             R_PRE: begin
-                r_rnd <= pre_rnd;
-                if (pre_rnd && !p_in_rng) stat_ill_rd <= stat_ill_rd + 16'd1;
-                if (!p_target_ok) begin
-                    if (!pre_rnd)            stat_noframe <= stat_noframe + 16'd1;
-                    else if (p_in_rng)       stat_ill_rd  <= stat_ill_rd  + 16'd1;
+                r_rnd       <= pre_rnd;
+                pre2_eff    <= p_eff;
+                pre2_in_rng <= p_in_rng;
+                rstate      <= R_PRE2;
+            end
+            //-----------------------------------------------------------------
+            // W5 cut-2: table-lookup beat. All table indices are REGISTERS now,
+            // so the 256:1 LUT tree (full_bit/len_tab/len_beats_tab) has the
+            // whole cycle to itself.
+            R_PRE2: begin
+                if (r_rnd && !pre2_in_rng) stat_ill_rd <= stat_ill_rd + 16'd1;
+                if (!p2_target_ok) begin
+                    if (!r_rnd)              stat_noframe <= stat_noframe + 16'd1;
+                    else if (pre2_in_rng)   stat_ill_rd  <= stat_ill_rd  + 16'd1;
+                    // defined empty answer (zero-length frame)
                     rd_wr_en    <= 1'b1;
                     rd_wr_data  <= {1'b1, 16'd0, 8'hFF};
                     dbg_rd_slot <= 8'hFF;
                     rstate      <= R_IDLE;
                 end else begin
-                    r_slot  <= p_eff;
-                    r_len   <= len_tab[p_eff];
-                    r_beats <= len_beats_tab[p_eff];
+                    r_slot  <= pre2_eff;
+                    r_len   <= len_tab[pre2_eff];
+                    r_beats <= len_beats_tab[pre2_eff];   // precomputed, no adder
                     r_beat  <= 8'd0;
-                    dbg_rd_slot <= p_eff;
+                    dbg_rd_slot <= pre2_eff;
                     rstate  <= R_AR;
                 end
             end
