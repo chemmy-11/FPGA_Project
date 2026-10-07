@@ -1,34 +1,18 @@
 //=============================================================================
-// axi_arb_2to1.v — 两主一从 AXI4 仲裁器（prj10 W4, ui_clk 同域, 纯 RTL）
+// axi_arb_2to1_defect.v -- NEGATIVE CONTROL copy of the PRE-FIX arbiter (W4)
 //-----------------------------------------------------------------------------
-// 为什么自研: SmartConnect/AXI Interconnect 在 2023.1 均锁定 IP Integrator
-//   ("only supported in IPI", 2026-10-06 实测), 独立 Tcl 生成产物为空壳 BD;
-//   且后继 D2 描述符环同样要动这一层 —— 自研 + 单元仿真符合本工程判据文化。
-//
-// 职责: 桥①(S00) 与 桥②(S01) 轮转共享 MIG(M) 的单一 AXI4 从机口。
-// 协议假设(由上游 frame_mem_if/axi4_master_bridge 保证, 两者同构):
-//   - 每主任意时刻至多一个未完成写事务 + 一个未完成读事务
-//   - 写: AW 握手后 W 突发连续, 以 B 握手结束
-//   - 读: AR 握手后 R 突发连续, 以 RLAST 结束
-//   - ID 不重排: 主0 ID=4'h0, 主1 ID=4'h1, 透传即可
-// 仲裁: 事务级轮转 —— AW/AR 各自独立授权并锁定到事务结束(B/RLAST),
-//   读写两方向并行授权互不阻塞(两主各一读一写, MIG 支持读写并发)。
-//
-// ⚠️ W4 修复(2026-10-07): B/R 响应路由改为按内部 wgrant/rgrant 锁存器,
-//   不再按 m_axi_bid[0]/m_axi_rid[0] 路由。原设计假设"主0 ID=4'h0, 主1 ID=4'h1",
-//   但两桥例化同一 axi4_master_bridge, awid/arid 均为硬编码常量(4'h0/4'h1),
-//   响应 ID 恒同 -> 按位路由会把所有写响应送 S00、所有读响应送 S01,
-//   板上必死锁(桥②写 FSM 等 B、桥①读 FSM 等首拍)。grant 路由与响应 ID 解耦:
-//   即使将来两桥 ID 再变化, 路由仍由授权历史唯一决定。仲裁器自身仍在同
-//   一 ui_clk 域, 无 CDC。
+// Reproduces the 2026-10-06 routing defect EXACTLY as it shipped in the
+// seventh-build bitstream: B/R responses routed by m_axi_bid[0] / m_axi_rid[0].
+// Kept in sim/ only -- never instantiated by RTL. Used by w4_joint_tb.sv with
+// DEFECT_ROUTING=1 to prove the joint bench FAILS on the old logic (verdict
+// non-vacuous) before trusting its PASS on the fixed logic.
 //=============================================================================
 `timescale 1ns / 1ps
 
-module axi_arb_2to1 (
+module axi_arb_2to1_defect (
     input  wire        clk,
     input  wire        rst_n,
 
-    // ---- S00: 桥① ----
     input  wire [3:0]  s00_axi_awid,    input  wire [31:0] s00_axi_awaddr,
     input  wire [7:0]  s00_axi_awlen,   input  wire [2:0]  s00_axi_awsize,
     input  wire [1:0]  s00_axi_awburst, input  wire        s00_axi_awlock,
@@ -50,7 +34,6 @@ module axi_arb_2to1 (
     output wire        s00_axi_rlast,   output wire        s00_axi_rvalid,
     input  wire        s00_axi_rready,  output wire [3:0]  s00_axi_rid,
 
-    // ---- S01: 桥② ----
     input  wire [3:0]  s01_axi_awid,    input  wire [31:0] s01_axi_awaddr,
     input  wire [7:0]  s01_axi_awlen,   input  wire [2:0]  s01_axi_awsize,
     input  wire [1:0]  s01_axi_awburst, input  wire        s01_axi_awlock,
@@ -72,14 +55,13 @@ module axi_arb_2to1 (
     output wire        s01_axi_rlast,   output wire        s01_axi_rvalid,
     input  wire        s01_axi_rready,  output wire [3:0]  s01_axi_rid,
 
-    // ---- M: MIG ----
     output wire [3:0]  m_axi_awid,      output wire [31:0] m_axi_awaddr,
     output wire [7:0]  m_axi_awlen,     output wire [2:0]  m_axi_awsize,
     output wire [1:0]  m_axi_awburst,   output wire        m_axi_awlock,
     output wire [3:0]  m_axi_awcache,   output wire [2:0]  m_axi_awprot,
     output wire [3:0]  m_axi_awqos,     output wire        m_axi_awvalid,
     input  wire        m_axi_awready,
-    output wire [511:0] m_axi_wdata,    output wire [63:0] m_axi_wstrb,
+    output wire [511:0] m_axi_wdata,    output wire [63:0]  m_axi_wstrb,
     output wire        m_axi_wlast,     output wire        m_axi_wvalid,
     input  wire        m_axi_wready,
     input  wire [1:0]  m_axi_bresp,     input  wire        m_axi_bvalid,
@@ -95,19 +77,15 @@ module axi_arb_2to1 (
     output wire        m_axi_rready,    input  wire [3:0]  m_axi_rid
 );
 
-    // ================= 写方向: AW 仲裁 + W 跟随 + B 路由 =================
-    reg wgrant;            // 0=S00 1=S01; 复位后从 S00 起
-    reg wbusy;             // 写事务进行中(AW 已握手到 B 握手)
-    reg wturn;             // 轮转优先: 上次授权的另一主优先
+    // ================= write direction (pre-fix: ID-bit routing) =================
+    reg wgrant, wbusy, wturn;
     wire req0 = s00_axi_awvalid;
     wire req1 = s01_axi_awvalid;
-    // 授权选择: 空闲时按轮转优先; 忙时锁定
     wire pick = wbusy ? wgrant : (wturn ? (req1 ? 1'b1 : 1'b0) : (req0 ? 1'b0 : 1'b1));
 
     assign s00_axi_awready = ~wbusy & req0 & (pick == 1'b0) & m_axi_awready;
     assign s01_axi_awready = ~wbusy & req1 & (pick == 1'b1) & m_axi_awready;
 
-    // 地址通道 mux(授权主直通)
     assign m_axi_awvalid  = ~wbusy & ((pick == 1'b0) ? req0 : req1);
     assign m_axi_awid     = (pick == 1'b0) ? s00_axi_awid     : s01_axi_awid;
     assign m_axi_awaddr   = (pick == 1'b0) ? s00_axi_awaddr   : s01_axi_awaddr;
@@ -119,7 +97,6 @@ module axi_arb_2to1 (
     assign m_axi_awprot   = (pick == 1'b0) ? s00_axi_awprot   : s01_axi_awprot;
     assign m_axi_awqos    = (pick == 1'b0) ? s00_axi_awqos    : s01_axi_awqos;
 
-    // 数据通道: 授权主直通, 另一主 wready=0
     assign m_axi_wvalid   = (wgrant == 1'b0) ? s00_axi_wvalid : s01_axi_wvalid;
     assign m_axi_wdata    = (wgrant == 1'b0) ? s00_axi_wdata  : s01_axi_wdata;
     assign m_axi_wstrb    = (wgrant == 1'b0) ? s00_axi_wstrb  : s01_axi_wstrb;
@@ -127,14 +104,12 @@ module axi_arb_2to1 (
     assign s00_axi_wready = (wgrant == 1'b0) & wbusy & m_axi_wready;
     assign s01_axi_wready = (wgrant == 1'b1) & wbusy & m_axi_wready;
 
-    // 写响应: 按授权锁存路由(W4 修复: 不依赖 bid —— 两桥 ID 恒同, 见文件头)
-    //   wbusy=1 期间 wgrant 即本事务授权主; B 握手完成前 wgrant 不变。
-    wire wresp_to_s01 = wbusy & (wgrant == 1'b1);
-    assign s00_axi_bvalid = m_axi_bvalid & ~wresp_to_s01;
-    assign s01_axi_bvalid = m_axi_bvalid &  wresp_to_s01;
+    // ★ DEFECT: routing by bid[0] (the pre-fix logic)
+    assign s00_axi_bvalid = m_axi_bvalid & (m_axi_bid[0] == 1'b0);
+    assign s01_axi_bvalid = m_axi_bvalid & (m_axi_bid[0] == 1'b1);
     assign s00_axi_bresp  = m_axi_bresp;  assign s00_axi_bid = m_axi_bid;
     assign s01_axi_bresp  = m_axi_bresp;  assign s01_axi_bid = m_axi_bid;
-    assign m_axi_bready   = wresp_to_s01 ? s01_axi_bready : s00_axi_bready;
+    assign m_axi_bready   = (m_axi_bid[0] == 1'b0) ? s00_axi_bready : s01_axi_bready;
 
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
@@ -142,20 +117,18 @@ module axi_arb_2to1 (
         end else begin
             if (!wbusy) begin
                 if (m_axi_awvalid && m_axi_awready) begin
-                    wbusy  <= 1'b1;                 // AW 握手 -> 进入事务
+                    wbusy  <= 1'b1;
                     wgrant <= pick;
-                    wturn  <= ~pick;                // 下次优先另一主
+                    wturn  <= ~pick;
                 end
             end else if (m_axi_bvalid && m_axi_bready) begin
-                wbusy <= 1'b0;                      // B 握手 -> 事务结束
+                wbusy <= 1'b0;
             end
         end
     end
 
-    // ================= 读方向: AR 仲裁 + R 路由 =================
-    reg rgrant;
-    reg rbusy;
-    reg rturn;
+    // ================= read direction (pre-fix: ID-bit routing) =================
+    reg rgrant, rbusy, rturn;
     wire rreq0 = s00_axi_arvalid;
     wire rreq1 = s01_axi_arvalid;
     wire rpick = rbusy ? rgrant : (rturn ? (rreq1 ? 1'b1 : 1'b0) : (rreq0 ? 1'b0 : 1'b1));
@@ -174,16 +147,14 @@ module axi_arb_2to1 (
     assign m_axi_arprot   = (rpick == 1'b0) ? s00_axi_arprot   : s01_axi_arprot;
     assign m_axi_arqos    = (rpick == 1'b0) ? s00_axi_arqos    : s01_axi_arqos;
 
-    // 读数据: 按授权锁存路由回授权主(W4 修复: 不依赖 rid —— 理由同 B 通道)
-    //   rbusy=1 期间 rgrant 即本读事务授权主; RLAST 拍完成前 rgrant 不变。
-    wire rresp_to_s01 = rbusy & (rgrant == 1'b1);
-    assign s00_axi_rvalid = m_axi_rvalid & ~rresp_to_s01;
-    assign s01_axi_rvalid = m_axi_rvalid &  rresp_to_s01;
+    // ★ DEFECT: routing by rid[0] (the pre-fix logic)
+    assign s00_axi_rvalid = m_axi_rvalid & (m_axi_rid[0] == 1'b0);
+    assign s01_axi_rvalid = m_axi_rvalid & (m_axi_rid[0] == 1'b1);
     assign s00_axi_rdata  = m_axi_rdata;  assign s00_axi_rresp = m_axi_rresp;
     assign s00_axi_rlast  = m_axi_rlast;  assign s00_axi_rid   = m_axi_rid;
     assign s01_axi_rdata  = m_axi_rdata;  assign s01_axi_rresp = m_axi_rresp;
     assign s01_axi_rlast  = m_axi_rlast;  assign s01_axi_rid   = m_axi_rid;
-    assign m_axi_rready   = rresp_to_s01 ? s01_axi_rready : s00_axi_rready;
+    assign m_axi_rready   = (m_axi_rid[0] == 1'b0) ? s00_axi_rready : s01_axi_rready;
 
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
@@ -196,7 +167,7 @@ module axi_arb_2to1 (
                     rturn  <= ~rpick;
                 end
             end else if (m_axi_rvalid && m_axi_rready && m_axi_rlast) begin
-                rbusy <= 1'b0;                          // RLAST -> 事务结束
+                rbusy <= 1'b0;
             end
         end
     end

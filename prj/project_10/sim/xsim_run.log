@@ -1,0 +1,63 @@
+=== prj10 W2 sim 周三 2026/10/07 15:13:14.30 === 
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "D:/FPGA/prj/project_10/rtl/async_fifo.v" into library work
+INFO: [VRFC 10-311] analyzing module async_fifo
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "D:/FPGA/prj/project_10/rtl/axi4_master_bridge.v" into library work
+INFO: [VRFC 10-311] analyzing module axi4_master_bridge
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "D:/FPGA/prj/project_10/rtl/frame_mem_if.v" into library work
+INFO: [VRFC 10-311] analyzing module frame_mem_if
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "D:/FPGA/prj/project_10/sim/axi4_ram_model.v" into library work
+INFO: [VRFC 10-311] analyzing module axi4_ram_model
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "D:/FPGA/prj/project_10/sim/mem_bridge_tb.sv" into library work
+INFO: [VRFC 10-311] analyzing module mem_bridge_tb
+Vivado Simulator v2023.1
+Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.
+Copyright 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+Running: D:/Xilinx/Vivado/2023.1/bin/unwrapped/win64.o/xelab.exe -debug typical mem_bridge_tb -s mem_bridge_sim 
+Multi-threading is on. Using 22 slave threads.
+Starting static elaboration
+Pass Through NonSizing Optimizer
+Completed static elaboration
+Starting simulation data flow analysis
+Completed simulation data flow analysis
+Time Resolution for simulation is 1ps
+Compiling module work.async_fifo(AW=12)
+Compiling module work.async_fifo(DW=16,AW=3)
+Compiling module work.async_fifo(DW=9,AW=2)
+Compiling module work.async_fifo(DW=25,AW=2)
+Compiling module work.axi4_master_bridge
+Compiling module work.frame_mem_if_default
+Compiling module work.axi4_ram_model
+Compiling module work.mem_bridge_tb
+Built simulation snapshot mem_bridge_sim
+
+****** xsim v2023.1 (64-bit)
+  **** SW Build 3865809 on Sun May  7 15:05:29 MDT 2023
+  **** IP Build 3864474 on Sun May  7 20:36:21 MDT 2023
+  **** SharedData Build 3865790 on Sun May 07 13:33:03 MDT 2023
+    ** Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.
+    ** Copyright 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+
+source xsim.dir/mem_bridge_sim/xsim_script.tcl
+# xsim {mem_bridge_sim} -autoloadwcfg -runall
+Time resolution is 1 ps
+run -all
+=== prj10 W2 memory-bridge simulation (user 151.5MHz / ui 300MHz) ===
+T6: calib_ok=0 -> 2 AXI beats, gate holds, no hang
+T6 (MIG hard gate) PASS
+T1 (J2 byte-exact, 8 lengths) PASS
+T4 (J3 random read: order == commands, contents slot-exact) PASS
+T5 (J5 defined illegal/empty reads + counters) PASS
+T2 (J4 300 frames through a wrapping 256-slot region) PASS
+T3 fill: sends=257 pushed=257 committed=256 outstanding=256
+T3 chain: pushed=257 == committed=256 + bridge_stall=1  |  refusals counted=9 (buffer drops=8)
+T3 (slot watermark: no unread frame overwritten, refusals counted) PASS
+STAT counters: wm=585 wr_frame=585 rd_frame=585 wr_stall=1 ill_rd=3 noframe=0 bresp_err=0
+STAT axi: wr_beats=8202 rd_beats=8202 4k_violation=0 axi_proto_err=0
+STAT margin: user_pushed=586 ui_committed=585 user_drop=8 hold_cycles=24100
+STAT service: wr=933 ui-cycles/frame (3.11 us @300MHz)  rd=920 (3.07 us)  frame period 12.30 us
+STAT wstrb: full=7655 partial_tail=547 illegal=0
+=== prj10 W2 SIM: PASS (0 errors) ===
+$finish called at time : 8812452 ns : File "D:/FPGA/prj/project_10/sim/mem_bridge_tb.sv" Line 487
+run: Time (s): cpu = 00:00:00 ; elapsed = 00:00:06 . Memory (MB): peak = 197.418 ; gain = 0.000
+exit
+INFO: [Common 17-206] Exiting xsim at Wed Oct  7 15:13:27 2026...

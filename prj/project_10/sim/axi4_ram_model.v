@@ -14,6 +14,8 @@
 
 module axi4_ram_model #(
     parameter MEM_BYTES = (1<<20),   // 1 MB -> covers one 256x4KB slot region
+    parameter AW        = 20,        // W4: address bits used for the modulo index
+                                     // (2 MB = two 256x4KB slot regions -> AW=21)
     parameter AR_LAT    = 8,         // ui cycles before the FIRST read beat (base)
     parameter W_RESP_DLY= 0,         // A2: EXTRA ui cycles before BVALID (0 = W2 baseline,
                                      //     byte-identical timing; target Lw = 2 + W_RESP_DLY)
@@ -70,6 +72,13 @@ module axi4_ram_model #(
 );
 
     reg [7:0] mem [0:MEM_BYTES-1];
+
+    // ---- A2b (W4): parameterized address slice --------------------------
+    // Original hardcoded [19:0] matched MEM_BYTES=(1<<20). With two slot
+    // regions (0x0010_0000 ING + 0x0020_0000 EGR = 2 MB) the index must take
+    // AW bits, else the two regions alias onto each other and bridge-2 reads
+    // back bridge-1's bytes.
+    // ----------------------------------------------------------------------
 
     // ---- A1: ID echo (AXI requires bid/rid to match the request ID) ----
     reg [3:0] awid_r, arid_r;
@@ -132,7 +141,7 @@ module axi4_ram_model #(
                 s_wready <= ~stall;
                 if (s_wvalid && s_wready) begin
                     for (mi = 0; mi < 64; mi = mi + 1)
-                        if (s_wstrb[mi]) mem[(waddr[19:0] + mi) % MEM_BYTES] <= s_wdata[mi*8 +: 8];
+                        if (s_wstrb[mi]) mem[(waddr[(AW-1):0] + mi) % MEM_BYTES] <= s_wdata[mi*8 +: 8];
                     waddr <= waddr + 32'd64;
                     wcnt  <= wcnt + 8'd1;
                     mon_wb <= mon_wb + 32'd1;
@@ -209,38 +218,38 @@ module axi4_ram_model #(
                 if (!s_rvalid && !stall) begin
                     s_rvalid <= 1'b1;
                     s_rresp  <= 2'b00;
-                s_rdata  <= {mem[(raddr[19:0] + 63) % MEM_BYTES], mem[(raddr[19:0] + 62) % MEM_BYTES],
-                             mem[(raddr[19:0] + 61) % MEM_BYTES], mem[(raddr[19:0] + 60) % MEM_BYTES],
-                             mem[(raddr[19:0] + 59) % MEM_BYTES], mem[(raddr[19:0] + 58) % MEM_BYTES],
-                             mem[(raddr[19:0] + 57) % MEM_BYTES], mem[(raddr[19:0] + 56) % MEM_BYTES],
-                             mem[(raddr[19:0] + 55) % MEM_BYTES], mem[(raddr[19:0] + 54) % MEM_BYTES],
-                             mem[(raddr[19:0] + 53) % MEM_BYTES], mem[(raddr[19:0] + 52) % MEM_BYTES],
-                             mem[(raddr[19:0] + 51) % MEM_BYTES], mem[(raddr[19:0] + 50) % MEM_BYTES],
-                             mem[(raddr[19:0] + 49) % MEM_BYTES], mem[(raddr[19:0] + 48) % MEM_BYTES],
-                             mem[(raddr[19:0] + 47) % MEM_BYTES], mem[(raddr[19:0] + 46) % MEM_BYTES],
-                             mem[(raddr[19:0] + 45) % MEM_BYTES], mem[(raddr[19:0] + 44) % MEM_BYTES],
-                             mem[(raddr[19:0] + 43) % MEM_BYTES], mem[(raddr[19:0] + 42) % MEM_BYTES],
-                             mem[(raddr[19:0] + 41) % MEM_BYTES], mem[(raddr[19:0] + 40) % MEM_BYTES],
-                             mem[(raddr[19:0] + 39) % MEM_BYTES], mem[(raddr[19:0] + 38) % MEM_BYTES],
-                             mem[(raddr[19:0] + 37) % MEM_BYTES], mem[(raddr[19:0] + 36) % MEM_BYTES],
-                             mem[(raddr[19:0] + 35) % MEM_BYTES], mem[(raddr[19:0] + 34) % MEM_BYTES],
-                             mem[(raddr[19:0] + 33) % MEM_BYTES], mem[(raddr[19:0] + 32) % MEM_BYTES],
-                             mem[(raddr[19:0] + 31) % MEM_BYTES], mem[(raddr[19:0] + 30) % MEM_BYTES],
-                             mem[(raddr[19:0] + 29) % MEM_BYTES], mem[(raddr[19:0] + 28) % MEM_BYTES],
-                             mem[(raddr[19:0] + 27) % MEM_BYTES], mem[(raddr[19:0] + 26) % MEM_BYTES],
-                             mem[(raddr[19:0] + 25) % MEM_BYTES], mem[(raddr[19:0] + 24) % MEM_BYTES],
-                             mem[(raddr[19:0] + 23) % MEM_BYTES], mem[(raddr[19:0] + 22) % MEM_BYTES],
-                             mem[(raddr[19:0] + 21) % MEM_BYTES], mem[(raddr[19:0] + 20) % MEM_BYTES],
-                             mem[(raddr[19:0] + 19) % MEM_BYTES], mem[(raddr[19:0] + 18) % MEM_BYTES],
-                             mem[(raddr[19:0] + 17) % MEM_BYTES], mem[(raddr[19:0] + 16) % MEM_BYTES],
-                             mem[(raddr[19:0] + 15) % MEM_BYTES], mem[(raddr[19:0] + 14) % MEM_BYTES],
-                             mem[(raddr[19:0] + 13) % MEM_BYTES], mem[(raddr[19:0] + 12) % MEM_BYTES],
-                             mem[(raddr[19:0] + 11) % MEM_BYTES], mem[(raddr[19:0] + 10) % MEM_BYTES],
-                             mem[(raddr[19:0] +  9) % MEM_BYTES], mem[(raddr[19:0] +  8) % MEM_BYTES],
-                             mem[(raddr[19:0] +  7) % MEM_BYTES], mem[(raddr[19:0] +  6) % MEM_BYTES],
-                             mem[(raddr[19:0] +  5) % MEM_BYTES], mem[(raddr[19:0] +  4) % MEM_BYTES],
-                             mem[(raddr[19:0] +  3) % MEM_BYTES], mem[(raddr[19:0] +  2) % MEM_BYTES],
-                             mem[(raddr[19:0] +  1) % MEM_BYTES], mem[(raddr[19:0] +  0) % MEM_BYTES]};
+                s_rdata  <= {mem[(raddr[(AW-1):0] + 63) % MEM_BYTES], mem[(raddr[(AW-1):0] + 62) % MEM_BYTES],
+                             mem[(raddr[(AW-1):0] + 61) % MEM_BYTES], mem[(raddr[(AW-1):0] + 60) % MEM_BYTES],
+                             mem[(raddr[(AW-1):0] + 59) % MEM_BYTES], mem[(raddr[(AW-1):0] + 58) % MEM_BYTES],
+                             mem[(raddr[(AW-1):0] + 57) % MEM_BYTES], mem[(raddr[(AW-1):0] + 56) % MEM_BYTES],
+                             mem[(raddr[(AW-1):0] + 55) % MEM_BYTES], mem[(raddr[(AW-1):0] + 54) % MEM_BYTES],
+                             mem[(raddr[(AW-1):0] + 53) % MEM_BYTES], mem[(raddr[(AW-1):0] + 52) % MEM_BYTES],
+                             mem[(raddr[(AW-1):0] + 51) % MEM_BYTES], mem[(raddr[(AW-1):0] + 50) % MEM_BYTES],
+                             mem[(raddr[(AW-1):0] + 49) % MEM_BYTES], mem[(raddr[(AW-1):0] + 48) % MEM_BYTES],
+                             mem[(raddr[(AW-1):0] + 47) % MEM_BYTES], mem[(raddr[(AW-1):0] + 46) % MEM_BYTES],
+                             mem[(raddr[(AW-1):0] + 45) % MEM_BYTES], mem[(raddr[(AW-1):0] + 44) % MEM_BYTES],
+                             mem[(raddr[(AW-1):0] + 43) % MEM_BYTES], mem[(raddr[(AW-1):0] + 42) % MEM_BYTES],
+                             mem[(raddr[(AW-1):0] + 41) % MEM_BYTES], mem[(raddr[(AW-1):0] + 40) % MEM_BYTES],
+                             mem[(raddr[(AW-1):0] + 39) % MEM_BYTES], mem[(raddr[(AW-1):0] + 38) % MEM_BYTES],
+                             mem[(raddr[(AW-1):0] + 37) % MEM_BYTES], mem[(raddr[(AW-1):0] + 36) % MEM_BYTES],
+                             mem[(raddr[(AW-1):0] + 35) % MEM_BYTES], mem[(raddr[(AW-1):0] + 34) % MEM_BYTES],
+                             mem[(raddr[(AW-1):0] + 33) % MEM_BYTES], mem[(raddr[(AW-1):0] + 32) % MEM_BYTES],
+                             mem[(raddr[(AW-1):0] + 31) % MEM_BYTES], mem[(raddr[(AW-1):0] + 30) % MEM_BYTES],
+                             mem[(raddr[(AW-1):0] + 29) % MEM_BYTES], mem[(raddr[(AW-1):0] + 28) % MEM_BYTES],
+                             mem[(raddr[(AW-1):0] + 27) % MEM_BYTES], mem[(raddr[(AW-1):0] + 26) % MEM_BYTES],
+                             mem[(raddr[(AW-1):0] + 25) % MEM_BYTES], mem[(raddr[(AW-1):0] + 24) % MEM_BYTES],
+                             mem[(raddr[(AW-1):0] + 23) % MEM_BYTES], mem[(raddr[(AW-1):0] + 22) % MEM_BYTES],
+                             mem[(raddr[(AW-1):0] + 21) % MEM_BYTES], mem[(raddr[(AW-1):0] + 20) % MEM_BYTES],
+                             mem[(raddr[(AW-1):0] + 19) % MEM_BYTES], mem[(raddr[(AW-1):0] + 18) % MEM_BYTES],
+                             mem[(raddr[(AW-1):0] + 17) % MEM_BYTES], mem[(raddr[(AW-1):0] + 16) % MEM_BYTES],
+                             mem[(raddr[(AW-1):0] + 15) % MEM_BYTES], mem[(raddr[(AW-1):0] + 14) % MEM_BYTES],
+                             mem[(raddr[(AW-1):0] + 13) % MEM_BYTES], mem[(raddr[(AW-1):0] + 12) % MEM_BYTES],
+                             mem[(raddr[(AW-1):0] + 11) % MEM_BYTES], mem[(raddr[(AW-1):0] + 10) % MEM_BYTES],
+                             mem[(raddr[(AW-1):0] +  9) % MEM_BYTES], mem[(raddr[(AW-1):0] +  8) % MEM_BYTES],
+                             mem[(raddr[(AW-1):0] +  7) % MEM_BYTES], mem[(raddr[(AW-1):0] +  6) % MEM_BYTES],
+                             mem[(raddr[(AW-1):0] +  5) % MEM_BYTES], mem[(raddr[(AW-1):0] +  4) % MEM_BYTES],
+                             mem[(raddr[(AW-1):0] +  3) % MEM_BYTES], mem[(raddr[(AW-1):0] +  2) % MEM_BYTES],
+                             mem[(raddr[(AW-1):0] +  1) % MEM_BYTES], mem[(raddr[(AW-1):0] +  0) % MEM_BYTES]};
                 end
                 if (s_rvalid && s_rready) begin
                     raddr   <= raddr + 32'd64;

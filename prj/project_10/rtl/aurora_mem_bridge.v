@@ -10,7 +10,10 @@
 //      --> [内存桥② EGR 0x0020_0000: 写DDR4/SEQ读回]                    ←W4
 //      --> 帧泵B(CDC) --> RGMII TX --> PC
 //   W4: 两级内存全环路(导师语义③④: 光回环后再存内存再读出); AXI 互联 =
-//       SmartConnect 2主1从(S00=桥① S01=桥② M00=MIG, ui_clk 同域)
+//       自研 axi_arb_2to1 两主一从(S00=桥① S01=桥② M=MIG, ui_clk 同域)
+//       (SmartConnect/AXI Interconnect 2023.1 均锁 IP Integrator, 实测独立
+//        生成产物为空壳 -> 放弃 IP 互联, 见坑账本 #22; B/R 响应按授权
+//        锁存路由, 2026-10-07 修复 —— 原 bid/rid[0] 路由在两桥同 ID 下死锁)
 //
 // 派生原则（执行单 2026-10-04）：整份复制 prj9 顶层，只改:
 //   1. u_pack 输入: pump_fwd_data/en → mem_rd_data/mem_rd_en（frame_mem_if 读侧）

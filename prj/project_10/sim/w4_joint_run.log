@@ -1,0 +1,110 @@
+=== prj10 W4 joint sim 周三 2026/10/07 15:12:36.48 === 
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "D:/FPGA/prj/project_10/rtl/async_fifo.v" into library work
+INFO: [VRFC 10-311] analyzing module async_fifo
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "D:/FPGA/prj/project_10/rtl/axi4_master_bridge.v" into library work
+INFO: [VRFC 10-311] analyzing module axi4_master_bridge
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "D:/FPGA/prj/project_10/rtl/frame_mem_if.v" into library work
+INFO: [VRFC 10-311] analyzing module frame_mem_if
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "D:/FPGA/prj/project_10/rtl/axi_arb_2to1.v" into library work
+INFO: [VRFC 10-311] analyzing module axi_arb_2to1
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "D:/FPGA/prj/project_10/sim/axi4_ram_model.v" into library work
+INFO: [VRFC 10-311] analyzing module axi4_ram_model
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "D:/FPGA/prj/project_10/sim/axi_arb_2to1_defect.v" into library work
+INFO: [VRFC 10-311] analyzing module axi_arb_2to1_defect
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "D:/FPGA/prj/project_10/sim/w4_joint_tb.sv" into library work
+INFO: [VRFC 10-311] analyzing module w4_joint_tb
+Vivado Simulator v2023.1
+Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.
+Copyright 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+Running: D:/Xilinx/Vivado/2023.1/bin/unwrapped/win64.o/xelab.exe -debug typical w4_joint_tb -s w4_joint_defect -generic_top DEFECT_ROUTING=1 
+Multi-threading is on. Using 22 slave threads.
+Starting static elaboration
+Pass Through NonSizing Optimizer
+Completed static elaboration
+Starting simulation data flow analysis
+Completed simulation data flow analysis
+Time Resolution for simulation is 1ps
+Compiling module work.async_fifo(AW=12)
+Compiling module work.async_fifo(DW=16,AW=3)
+Compiling module work.async_fifo(DW=9,AW=2)
+Compiling module work.async_fifo(DW=25,AW=2)
+Compiling module work.axi4_master_bridge
+Compiling module work.frame_mem_if_default
+Compiling module work.axi4_master_bridge(SLOT_BASE=32'...
+Compiling module work.frame_mem_if(SLOT_BASE=32'b01000...
+Compiling module work.axi_arb_2to1_defect
+Compiling module work.axi4_ram_model(MEM_BYTES=2097152...
+Compiling module work.w4_joint_tb(DEFECT_ROUTING=1'b1)
+Built simulation snapshot w4_joint_defect
+
+****** xsim v2023.1 (64-bit)
+  **** SW Build 3865809 on Sun May  7 15:05:29 MDT 2023
+  **** IP Build 3864474 on Sun May  7 20:36:21 MDT 2023
+  **** SharedData Build 3865790 on Sun May 07 13:33:03 MDT 2023
+    ** Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.
+    ** Copyright 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+
+source xsim.dir/w4_joint_defect/xsim_script.tcl
+# xsim {w4_joint_defect} -autoloadwcfg -runall
+Time resolution is 1 ps
+run -all
+=== prj10 W4 joint sim (two bridges + arbiter + 2MB RAM) DEFECT=1 ===
+[FAIL] recvA timeout
+[FAIL] J-A A len fid=0 got=0 exp=26
+[FAIL] issue_rdB: no outstanding frame / busy stuck
+[FAIL] DEADLOCK: A_ost=1 B_ost=0 mon_wb=2 mon_rb=0 (quiet window tripped)
+=== prj10 W4 JOINT SIM: FAIL (deadlock) ===
+$finish called at time : 667775195 ps : File "D:/FPGA/prj/project_10/sim/w4_joint_tb.sv" Line 625
+exit
+INFO: [Common 17-206] Exiting xsim at Wed Oct  7 15:12:44 2026...
+Vivado Simulator v2023.1
+Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.
+Copyright 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+Running: D:/Xilinx/Vivado/2023.1/bin/unwrapped/win64.o/xelab.exe -debug typical w4_joint_tb -s w4_joint_fixed 
+Multi-threading is on. Using 22 slave threads.
+Starting static elaboration
+Pass Through NonSizing Optimizer
+Completed static elaboration
+Starting simulation data flow analysis
+Completed simulation data flow analysis
+Time Resolution for simulation is 1ps
+Compiling module work.async_fifo(AW=12)
+Compiling module work.async_fifo(DW=16,AW=3)
+Compiling module work.async_fifo(DW=9,AW=2)
+Compiling module work.async_fifo(DW=25,AW=2)
+Compiling module work.axi4_master_bridge
+Compiling module work.frame_mem_if_default
+Compiling module work.axi4_master_bridge(SLOT_BASE=32'...
+Compiling module work.frame_mem_if(SLOT_BASE=32'b01000...
+Compiling module work.axi_arb_2to1
+Compiling module work.axi4_ram_model(MEM_BYTES=2097152...
+Compiling module work.w4_joint_tb
+Built simulation snapshot w4_joint_fixed
+
+****** xsim v2023.1 (64-bit)
+  **** SW Build 3865809 on Sun May  7 15:05:29 MDT 2023
+  **** IP Build 3864474 on Sun May  7 20:36:21 MDT 2023
+  **** SharedData Build 3865790 on Sun May 07 13:33:03 MDT 2023
+    ** Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.
+    ** Copyright 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+
+source xsim.dir/w4_joint_fixed/xsim_script.tcl
+# xsim {w4_joint_fixed} -autoloadwcfg -runall
+Time resolution is 1 ps
+run -all
+=== prj10 W4 joint sim (two bridges + arbiter + 2MB RAM) DEFECT=0 ===
+[P1] interleaved push+read 12+12 frames, committed A=12 B=12
+[J-B] both-bridges-busy witnessed (latched during P1/P2)
+P1/P2 (interleaved push+read, byte-exact, fork/join concurrency) PASS
+[P3] A: wr=12 rd=12 wm=12 | B: wr=12 rd=12 wm=12 | 4k=0 proto=0
+[P3] beats: A-region=102 B-region=103 (both must be >0)
+P3 (account closure + protocol) PASS
+P4 (sustained volume, 96 more frames each, still byte-exact) PASS
+[P5] pipeline drain: A wr=148 rd=148 wm=148 | B wr=148 rd=148 wm=148
+P5 (pipeline mode: free-running reads, account closure) PASS
+STAT A: wm=148 wr=148 rd=148 stall=0 ill=0 drop=0 bresp=0 len_err=0
+STAT B: wm=148 wr=148 rd=148 stall=0 ill=0 drop=0 bresp=0 len_err=0
+=== prj10 W4 JOINT SIM: PASS (0 errors) ===
+$finish called at time : 2347144335 ps : File "D:/FPGA/prj/project_10/sim/w4_joint_tb.sv" Line 604
+exit
+INFO: [Common 17-206] Exiting xsim at Wed Oct  7 15:12:53 2026...

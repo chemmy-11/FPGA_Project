@@ -146,12 +146,13 @@ D:\FPGA\prj\project_N\
 | 20 | `xdc_lint` 对 GT 参考时钟报 `MISSING_IOSTANDARD`（**误报，别照改**） | `gt_refclk_p/n`（T6/T5 = MGTREFCLK1_X1Y2）是 **GT 专用引脚**，不需要也不应写 IOSTANDARD。事实源：官方 GT Wizard 例程 `gtwizard_ultrascale_0_example_top.xdc` L56-57 **同样只写 `package_pin`**（而同文件对 `sys_clk`/`sfp_rs` 等普通 IO 都写了 IOSTANDARD）；prj9 同写法综合日志 **0 条 NSTD-1/BIVC-1**。⇒ 见此类告警**先判端口是否为 GT 专用脚**，是则忽略 |
 | 21 | **vivado-mcp `start_session` 必失败（`RuntimeError: Vivado GUI 进程提前退出`）** | 0.3.26 把「`vivado_mcp_server.tcl` 的路径」写进一个只含 ASCII 的临时 `.tcl`（`D:\FPGA\tmpXXXX.tcl`）交给 `vivado -source`，而 **Vivado 的 Tcl 按系统 ANSI(GBK) 解码该文件** → 安装路径里的「毕设」解成「姣曡??」→ `couldn't read file ... no such file or directory`。与 #1 同根（GBK 码位）。**修法 = 把整个安装搬到纯 ASCII 路径**（2026-10-01 实做：`C:\Users\15266\Desktop\毕设\.mcp-pilot` → `D:\vivado-mcp`，含 venv+site）；`C:` 侧旧路径留转发壳。**注意 mcp 包自身的 `_check_ascii_paths` 已经把非 ASCII 路径列为红线**，但只查 vivado_path 与 cwd，**查不到包安装路径**——所以这条只能靠安装位置保证 |
 | 22 | **SmartConnect / AXI Interconnect 2023.1 均锁 IP Integrator**——独立 Tcl `create_ip` 生成产物为**空壳**（实测 BD 内只有 aclk/aresetn，无任何 AXI 端口）；SC 改全局综合模式（`generate_synth_checkpoint false`）后 wrapper 与内核端口又不一致。**修法 = 自研仲裁器**（`prj_loop/rtl/axi_arb_2to1.v`，事务级轮转 + 单元仿真）；若必须用 IP 互联，只能在 Block Design 内创建（W4 六轮构建实证，2026-10-06/07） | AXI 互联选型：两主一从同域场景自研 ~200 行可控可仿真，比 BD 引入便宜 |
+| 23 | **多主共享 AXI 从机时，响应路由按 ID 位区分主 = 必死锁**——W4 仲裁器按 `bid[0]/rid[0]` 路由，但两桥例化同一 `axi4_master_bridge`（awid/arid 硬编码常量 4'h0/4'h1），MIG 回声 ID 后**所有写响应涌向桥①、所有读响应涌向桥②**，板上必挂（T22/T23 可能照常亮、ping 可能过，UDP 回显必挂——"看起来活了"最危险）。**单元 TB 掩盖路径**：arb_tb 给两主手工喂不同 ID + T4 读数据回传置 0 跳过。**修法 = 响应路由按内部授权锁存（wbusy&wgrant / rbusy&rgrant），与响应 ID 彻底解耦**（2026-10-07 上板前审查拦截，联合仿真负向对照复现死锁证明可检出；证据 `prj/project_10/sim/w4_joint_run.log`） | 系统级组合必须配系统级 TB：单元全绿 ≠ 集成不死锁；负向对照（故意例化缺陷副本必须 FAIL）是防"判据恒真"的标准动作 |
 
 ## 十、当前工程状态（一屏速览；内部详表见本节附录）
 
 - ✅ **D1 DDR4 校准 + W3 内存插入联调全过（2026-10-06，c27eea3/2465cf4）**：双位流校准全绿；集成位流 ping 20/20 + UDP 12/12 + 10MB 桥零丢零错 + 七级对账闭合；一条命令验证 prj_loop/scripts/udp_verify_ddr.py（四档全 PASS）
 - ✅ **过载硬冻结修复落地（2026-10-06 晚，9f29d7c）**：prj_loop/rtl_patch/udp_tx.v 派生副本（忙时锁存 pending，prj9 原件零改动）；R4 TB + 板上重放 pace 13µs 场景双验证，"过载只降速不冻结"达成
-- 🔄 **W4 两级内存全环路（暂停于第七轮构建，2026-10-07）**：桥② EGR + 自研 axi_arb_2to1 仲裁器（IP 互联两选均锁 IPI，见坑账本 #22；仲裁器单元仿真 8:8 轮转 PASS）；恢复点见 vault 待办
+- 🔄 **W4 两级内存全环路（缺陷修复 + 位流重建完成 2026-10-07，待 J4 上板）**：第七轮构建实际已成功（WNS=+0.035）；上板前审查拦截仲裁器 B/R 响应按 bid/rid[0] 路由 + 两桥常量 ID 恒同 → 必死锁（单元 TB 喂不同 ID 掩盖）。修复 = 按 wgrant/rgrant 授权锁存路由；新增两桥联合仿真 w4_joint_tb（负向对照复现死锁 + 正向 0 错误）+ 双回归逐字一致 + ila_snap.tcl 板上对账。J4 验证单就绪（vault 操作文档 10-07），待用户烧板
 > **README 分工变更（2026-10-01）**：仓库 `README.md` 改为**面向组员/新手的外部门面**（工程血缘图 + 通俗一览 + 快速开始）。原 README 承载的**内部信息**（工程索引详表、docs 文档中心指向、标准开发流程、挂起区触发条件）全部迁入本节附录，内部协作只看 AGENTS.md。
 
 - ✅ prj6 网口栈（09-04）· ✅ prj8 数据级桥 M2 判据全过（09-18，git 66ff43d）
