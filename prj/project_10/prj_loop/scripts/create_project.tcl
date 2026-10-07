@@ -19,6 +19,8 @@ add_files -fileset sources_1 [glob $P9/rtl/*.v $P9/rtl/*/*.v]
 ##   案A 忙时锁存 pending start; R4 TB 验证: 忙态帧正确补发/FIFO 清零/零错位
 remove_files -quiet [get_files -quiet $P9/rtl/udp/udp_tx.v]
 add_files -fileset sources_1 $P/rtl_patch/udp_tx.v
+# W5: UDP 命令通道（prj10 自研, 官方模块零改动）
+add_files -fileset sources_1 $P/rtl_patch/cmd_channel.v
 add_files -fileset sources_1 [glob $P9/shared_logic/*.v]
 
 ## ---- prj10: 内存桥三层 + 派生顶层(不含 w3_uiclk_top —— 那是前置工程专用顶层) ----

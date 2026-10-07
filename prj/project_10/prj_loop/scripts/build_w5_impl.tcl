@@ -1,5 +1,9 @@
 # =============================================================================
-# build_debug.tcl — prj10 prj_loop: synth + 脚本化插入 ILA（四域）+ 实现 + 位流
+# build_w5_impl.tcl — W5 专用: **复用已完成的 synth_1** + 插 ILA + W4 最优实现配方 + WNS 门限
+#   为什么存在: 本轮只改了构建脚本的探针表(不动 RTL), 无需重综合(省 ~12 分钟);
+#   且默认实现配方在 RND 使能后不收敛(WNS -1.142) —— 用 W4 实测最优配方:
+#     place ExtraTimingOpt + phys_opt AggressiveExplore + route NoTimingRelaxation + phys_opt AggressiveExplore
+#   WNS/WHS 不达标则不写位流(留 fail-safe, 避免误烧未收敛位流)
 # 派生自 prj9 build_debug.tcl; 差异:
 #   ILA0 追加 prj10 桥用户侧探针(mem_u_wr/rd/drop 16x3 + mem_rden + ost_sync 9)
 #   ILA3 新增 @ ui_clk(MIG ~300MHz): calib + 桥 ui 域计数器(严禁挂 user/eth 域 ILA)
@@ -11,16 +15,10 @@ set proj  D:/FPGA/prj/project_10/prj_loop
 file mkdir $proj/out
 
 open_project $proj/vivado/prj_loop.xpr
-# ---- ddr4_0 配置已改(System_Clock=No_Buffer): 强制重建其产物与 OOC run ----
-# reset_run synth_1 不级联 IP run; 不重建则顶层读到旧差分 stub -> [Synth 8-11365]
-reset_target  all [get_ips ddr4_0]
-generate_target all [get_ips ddr4_0]
-if {[llength [get_runs -quiet ddr4_0_synth_1]] > 0} { reset_run ddr4_0_synth_1 }
-reset_run synth_1
-launch_runs synth_1 -jobs 8
-wait_on_run synth_1
-puts "SYNTH_STATUS: [get_property STATUS [get_runs synth_1]]"
-if {[get_property PROGRESS [get_runs synth_1]] != "100%"} { error "synth failed" }
+# ---- 复用已完成的 synth_1（本轮 RTL 未变, 只换探针表/实现配方）----
+set st [get_property PROGRESS [get_runs synth_1]]
+puts "SYNTH_REUSE: synth_1 progress = $st"
+if {$st != "100%"} { error "synth_1 not complete ($st) —— 需先跑 build_debug.tcl" }
 open_run synth_1 -name synth_1
 
 proc one_net {name} {
@@ -221,12 +219,12 @@ if {[llength [get_debug_cores -quiet]] == 0} { error "debug cores lost after che
 implement_debug_core
 write_debug_probes -force $proj/scripts/probes.ltx
 
-# ============ 同会话手动实现（调试核已入网表）============
+# ============ W4 实测最优实现配方（RND 使能后默认配方不收敛）============
 opt_design
-place_design
-phys_opt_design
-route_design
-phys_opt_design
+place_design       -directive ExtraTimingOpt
+phys_opt_design    -directive AggressiveExplore
+route_design       -directive NoTimingRelaxation
+phys_opt_design    -directive AggressiveExplore
 
 report_clocks            -file $proj/out/rpt_clocks.rpt
 report_timing_summary -delay_type min_max -report_unconstrained -check_timing_verbose \
@@ -234,7 +232,17 @@ report_timing_summary -delay_type min_max -report_unconstrained -check_timing_ve
 report_timing -max_paths 25 -sort_by slack -file $proj/out/rpt_timing_worst.rpt
 puts "TIMING: [get_property SLACK [get_timing_paths -max_paths 1 -sort_by slack]]"
 
-write_checkpoint -force $proj/scripts/post_route.dcp
-write_bitstream -force $proj/out/aurora_mem_bridge.bit
+set wns [get_property SLACK [get_timing_paths -max_paths 1 -sort_by slack]]
+set whs [get_property SLACK [get_timing_paths -delay_type min -max_paths 1 -sort_by slack]]
+puts "WNS_W5: $wns"
+puts "WHS_W5: $whs"
 
-puts "DBG_BUILD_DONE: bit=$proj/out/aurora_mem_bridge.bit ltx=$proj/scripts/probes.ltx"
+if {$wns >= 0 && $whs >= 0} {
+    write_checkpoint -force $proj/scripts/post_route.dcp
+    write_debug_probes -force $proj/scripts/probes.ltx
+    write_bitstream -force $proj/out/aurora_mem_bridge.bit
+    puts "DBG_BUILD_DONE: bit=$proj/out/aurora_mem_bridge.bit ltx=$proj/scripts/probes.ltx"
+    puts "W5_BUILD_OK"
+} else {
+    puts "W5_BUILD_TIMING_FAIL: wns=$wns whs=$whs (未写位流)"
+}

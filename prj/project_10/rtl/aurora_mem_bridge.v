@@ -26,6 +26,13 @@
 //   6. 读命令自动生成: outstanding(user域灰码镜像)>0 且 !rd_busy → 单拍 rd_req
 //      （SEQ 模式模拟透传; 用 ro_outstanding_sync 而非 ro_wm —— 后者是 ui_clk
 //       域多比特计数, 跨域直采会读到中间值; 前者是桥内已做 gray+2FF 的合法镜像）
+//   7. ★W5(2026-10-07) UDP 命令通道 cmd_channel: RX 总线并联 tap → 目的端口
+//      1235 + magic "P10C" → 4 相握手邮箱进 user_clk → cfg_mode/cfg_rd_slot/
+//      rd_req_pulse。**命令必须发往广播 IP**(官方栈按目的 IP 丢弃, 故不进回显
+//      数据面/不占槽/不抬 wr_stall); 应答帧构造于 eth 域, 经 cmd_takeover mux
+//      注入泵A 输入(仅当栈 TX 空闲 ≥64 拍才接管, 避免切断在途回显帧)。
+//      RND 模式下 mem_rd_req 只由 rd_req_pulse 触发(不再自动读);
+//      桥② 仍 SEQ。复位后 cfg_mode=0 → 行为与 W4 完全一致(安全默认)。
 // 以太网栈/帧泵/打包/解包/Aurora/B 回显/判决计数器: 零改动（prj9 验证资产全保留）
 //
 // 帧完整性契约: frame_mem_if 读侧已改"攒满整帧再发射"(PRIME 状态, 2026-10-04),
@@ -97,8 +104,21 @@ wire          gmii_rx_clk, gmii_rx_dv, gmii_tx_clk;
 wire [7:0]    gmii_rxd;
 wire [7:0]    stack_txd;                  // 栈 TX（eth_ctrl 输出）→ 帧泵A
 wire          stack_tx_en;
-wire [7:0]    rgmii_txd_i;                // 帧泵B 回来 → RGMII TX
+// ---- W5 命令通道：应答帧注入（同域 mux，见文件头 7）----
+wire [7:0]    cmd_resp_txd;
+wire          cmd_resp_tx_en;
+wire          cmd_resp_busy;
+wire          cmd_cfg_mode;
+wire [7:0]    cmd_cfg_rd_slot;
+wire          cmd_rd_req_pulse;
+wire [15:0]   cmd_rx_cnt, cmd_err_cnt, cmd_exec_cnt, cmd_rd_trig_cnt;
+reg  [6:0]    tx_idle_cnt = 7'd0;         // RGMII TX 空闲拍数（≥64 才允许接管）
+wire          cmd_tx_idle = tx_idle_cnt[6];
+reg           cmd_takeover = 1'b0;
+wire [7:0]    rgmii_txd_i;                // 帧泵B 原始输出（未注入）
 wire          rgmii_tx_en_i;
+wire [7:0]    rgmii_txd_o;                // ★W5 末级注入后 → gmii_to_rgmii
+wire          rgmii_tx_en_o;
 
 wire          arp_gmii_tx_en; wire [7:0] arp_gmii_txd;
 wire          arp_rx_done, arp_rx_type;
@@ -240,9 +260,26 @@ wire [8:0]  mem_outstanding_sync;                     // user 域灰码镜像(�
 // 读命令生成: 槽中有未读帧 且 桥空闲 且 上一拍没发过 → 单拍
 // (ro_outstanding_sync 由桥内 gray+2FF 镜像, 单调语义; false-positive 空读
 //  会被桥内 noframe 计数+定长应答兜住, false-negative 只延迟一拍重判)
+// W5: SEQ = 原自动逻辑; RND = 只由命令通道的 rd_req_pulse 触发（命令通道保证单拍）
 always @(posedge user_clk) begin
-    if (aurora_rst) mem_rd_req <= 1'b0;
-    else            mem_rd_req <= (mem_outstanding_sync != 9'd0) && !mem_rd_busy && !mem_rd_req;
+    if (aurora_rst)          mem_rd_req <= 1'b0;
+    else if (cmd_cfg_mode)   mem_rd_req <= cmd_rd_req_pulse;
+    else                     mem_rd_req <= (mem_outstanding_sync != 9'd0) && !mem_rd_busy && !mem_rd_req;
+end
+
+// W5: RGMII TX 末级空闲计数 + 接管锁存（eth_rxc 域; gmii_tx_clk ≡ gmii_rx_clk）
+//  - 命令通道只在 cmd_tx_idle=1 时才允许拉 resp_busy（契约附录 v1.1）
+//  - 接管一旦开始就保持到本次应答帧发完，避免 mux 在帧中途切换
+//  - 空闲 ≥64 拍同时满足以太网 IFG（12B=96ns @1Gbps）
+always @(posedge gmii_rx_clk or negedge sys_rst_n) begin
+    if (!sys_rst_n)             tx_idle_cnt <= 7'd0;
+    else if (rgmii_tx_en_o)     tx_idle_cnt <= 7'd0;
+    else if (!(&tx_idle_cnt))   tx_idle_cnt <= tx_idle_cnt + 7'd1;
+end
+always @(posedge gmii_rx_clk or negedge sys_rst_n) begin
+    if (!sys_rst_n)            cmd_takeover <= 1'b0;
+    else if (!cmd_resp_busy)   cmd_takeover <= 1'b0;
+    else if (cmd_tx_idle)      cmd_takeover <= 1'b1;
 end
 
 //*******************************************************************
@@ -407,8 +444,8 @@ gmii_to_rgmii u_gmii_to_rgmii (
     .gmii_rx_dv   (gmii_rx_dv ),
     .gmii_rxd     (gmii_rxd   ),
     .gmii_tx_clk  (gmii_tx_clk),
-    .gmii_tx_en   (rgmii_tx_en_i),
-    .gmii_txd     (rgmii_txd_i  ),
+    .gmii_tx_en   (rgmii_tx_en_o),   // ★W5: 末级注入后（命令应答优先）
+    .gmii_txd     (rgmii_txd_o  ),
     .rgmii_rxc    (eth_rxc    ),
     .rgmii_rx_ctl (eth_rx_ctl ),
     .rgmii_rxd    (eth_rxd    ),
@@ -540,8 +577,42 @@ eth_ctrl u_eth_ctrl (
 );
 
 //*******************************************************************
+// ★ prj10 W5: UDP 命令通道（cmd_channel）
+//   RX 总线并联 tap（与 arp/icmp/udp 同结构）→ 目的端口 1235 + magic "P10C"
+//   → 4 相握手邮箱跨到 user_clk → cfg_mode/cfg_rd_slot/rd_req_pulse
+//   → 应答帧在 eth 域构造, 经 pump_a mux 注入栈 TX 出口（走既有环路回 PC）
+//   命令必须发往广播 IP（官方栈按目的 IP 丢弃）→ 不进回显数据面、不占槽
+//   官方模块零改动（契约: 操作文档/阶段三_prj10_W5命令通道接口契约_2026-10-07）
+//*******************************************************************
+cmd_channel u_cmd (
+    // eth_rxc 域（125MHz）
+    .clk_eth        (gmii_rx_clk      ),
+    .rst_eth_n      (sys_rst_n        ),
+    .gmii_rx_dv     (gmii_rx_dv       ),
+    .gmii_rxd       (gmii_rxd         ),
+    .tx_idle        (cmd_tx_idle      ),   // 栈 TX 空闲 ≥64 拍
+    .resp_tx_en     (cmd_resp_tx_en   ),
+    .resp_txd       (cmd_resp_txd     ),
+    .resp_busy      (cmd_resp_busy    ),
+    .cmd_rx_cnt     (cmd_rx_cnt       ),
+    .cmd_err_cnt    (cmd_err_cnt      ),
+    // user_clk 域（151.5MHz）
+    .clk_user       (user_clk         ),
+    .rst_user_n     (~aurora_rst      ),
+    .u_wr_frame     (mem_u_wr_frame   ),
+    .u_rd_frame     (mem_u_rd_frame   ),
+    .u_buf_drop     (mem_u_buf_drop   ),
+    .cfg_mode       (cmd_cfg_mode     ),
+    .cfg_rd_slot    (cmd_cfg_rd_slot  ),
+    .rd_req_pulse   (cmd_rd_req_pulse ),
+    .cmd_exec_cnt   (cmd_exec_cnt     ),
+    .rd_trig_cnt    (cmd_rd_trig_cnt  )
+);
+
+//*******************************************************************
 // 帧泵 A：栈 TX（eth_rxc）→ user_clk —— 与 prj9 相同
 // （输出不再直连 pack, 改喂内存桥写侧 —— 两根线之一）
+// W5: 输入保持直连 stack_txd —— 应答不走这条路（见 pump B 末级注入）
 //*******************************************************************
 frame_fifo_pump u_pump_fwd (
     .wr_clk       (gmii_rx_clk   ),
@@ -570,7 +641,7 @@ frame_mem_if #(.SLOT_BASE(32'h0010_0000), .MAX_LEN(16'd1538)) u_mem (
     .rd_slot_o(mem_rd_slot_o), .rd_len_o(mem_rd_len_o),
     .rd_frame_done(mem_rd_frame_done),
     .rd_req (mem_rd_req), .rd_busy (mem_rd_busy),
-    .cfg_mode(1'b0), .cfg_rd_slot(8'h00),              // SEQ 模式（模拟透传）
+    .cfg_mode(cmd_cfg_mode), .cfg_rd_slot(cmd_cfg_rd_slot),  // W5: 命令通道控制（复位后默认 SEQ）
     .ro_u_wr_frame(mem_u_wr_frame), .ro_u_rd_frame(mem_u_rd_frame),
     .ro_u_buf_drop(mem_u_buf_drop), .ro_u_hold_cycles(mem_u_hold_cycles),
     .ro_outstanding_sync(mem_outstanding_sync),
@@ -957,8 +1028,25 @@ frame_fifo_pump u_pump_rev (
     .rd_frame_cnt (pump_rev_rd   )
 );
 
-assign rgmii_txd_i   = pump_rev_data;
+//*******************************************************************
+// ★W5 命令通道应答注入点：RGMII TX 末级（eth_rxc 域，零 CDC）
+//   为什么在这里（而非泵A 输入）：
+//     泵A→桥① 是**内存写侧**。RND 模式下桥① 不再自动读，应答帧会被写进
+//     槽里、要等读序轮到它才出得来 —— ACK 事实上到不了 PC（GET_WATERMARK
+//     自锁）。故应答必须**绕开两级内存桥**，从网口末级直出。
+//   为什么安全：
+//     1) 仅在 TX 末级空闲 ≥64 拍时才允许接管（同时满足以太网 IFG）；
+//     2) 接管锁存后保持到整帧发完，绝不在帧中途切换；
+//     3) 命令为控制面稀疏流量，PC 侧同步流程（一条命令→等该命令的数据帧）
+//        下泵B 在应答时刻为空闲，接管不与他帧竞争。
+//   残余风险（已登记）：若应答发出的同一拍泵B 恰好起一帧，该帧首字节会被
+//     吞掉（PC 侧表现为该数据帧损坏/缺失，**不会静默通过**）。彻底消除需把
+//     注入点移到泵B 输入并引入 eth→user 字节 CDC，属后续可选项。
+//*******************************************************************
+assign rgmii_txd_i   = pump_rev_data;      // 泵B 原始
 assign rgmii_tx_en_i = pump_rev_en;
+assign rgmii_txd_o   = cmd_takeover ? cmd_resp_txd   : rgmii_txd_i;
+assign rgmii_tx_en_o = cmd_takeover ? cmd_resp_tx_en : rgmii_tx_en_i;
 
 //*******************************************************************
 // 观测 LED
@@ -1044,6 +1132,16 @@ end
 (* mark_debug = "true" *) wire [15:0] dbg_mem_u_drop= mem_u_buf_drop;
 (* mark_debug = "true" *) wire        dbg_mem_rden  = mem_rd_en;
 (* mark_debug = "true" *) wire [8:0]  dbg_mem_ost_s = mem_outstanding_sync;
+// ★ W5 命令通道观测（J5 可观测性）
+// user 域（ILA0）
+(* mark_debug = "true" *) wire        dbg_cmd_mode    = cmd_cfg_mode;
+(* mark_debug = "true" *) wire [7:0]  dbg_cmd_slot    = cmd_cfg_rd_slot;
+(* mark_debug = "true" *) wire [15:0] dbg_cmd_exec    = cmd_exec_cnt;
+(* mark_debug = "true" *) wire [15:0] dbg_cmd_trig    = cmd_rd_trig_cnt;
+// eth_rxc 域（ILA1）
+(* mark_debug = "true" *) wire [15:0] dbg_cmd_rx      = cmd_rx_cnt;
+(* mark_debug = "true" *) wire [15:0] dbg_cmd_err     = cmd_err_cnt;
+(* mark_debug = "true" *) wire        dbg_cmd_respbsy = cmd_resp_busy;
 // eth_rxc 域
 (* mark_debug = "true" *) wire [15:0] dbg_pfwd_wr   = pump_fwd_wr;
 (* mark_debug = "true" *) wire [15:0] dbg_pfwd_drop = pump_fwd_drop;
@@ -1089,6 +1187,11 @@ end
 (* mark_debug = "true" *) wire [8:0]  dbg_mem_ost     = mem_outstanding;
 (* mark_debug = "true" *) wire [7:0]  dbg_mem_wslot   = mem_dbg_wr_slot;
 (* mark_debug = "true" *) wire [7:0]  dbg_mem_rslot   = mem_dbg_rd_slot;
+// ★ W5 补: 非法读/无帧计数（契约 §4.3 负向轮对账）+ 读写突发数（J5「突发计数可观测」）
+(* mark_debug = "true" *) wire [15:0] dbg_mem_ill     = mem_ill_rd;
+(* mark_debug = "true" *) wire [15:0] dbg_mem_nofrm   = mem_noframe;
+(* mark_debug = "true" *) wire [31:0] dbg_mem_wbeats  = mem_dbg_wr_beats;
+(* mark_debug = "true" *) wire [31:0] dbg_mem_rbeats  = mem_dbg_rd_beats;
 // ★ W4: 桥②(EGRESS)观测 —— user/ui 域分挂同桥①纪律
 (* mark_debug = "true" *) wire [15:0] dbg_mem2_wm     = mem2_wm;
 (* mark_debug = "true" *) wire [15:0] dbg_mem2_wr_frm = mem2_wr_frame;

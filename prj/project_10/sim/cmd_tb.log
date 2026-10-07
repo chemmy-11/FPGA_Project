@@ -1,0 +1,232 @@
+=== prj10 W5 cmd_channel unit sim 周三 2026/10/07 19:57:24.99 === 
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "D:/FPGA/prj/project_10/prj_loop/rtl_patch/cmd_channel.v" into library work
+INFO: [VRFC 10-311] analyzing module cmd_channel
+INFO: [VRFC 10-2263] Analyzing SystemVerilog file "D:/FPGA/prj/project_10/sim/cmd_channel_tb.sv" into library work
+INFO: [VRFC 10-311] analyzing module cmd_channel_tb
+Vivado Simulator v2023.1
+Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.
+Copyright 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+Running: D:/Xilinx/Vivado/2023.1/bin/unwrapped/win64.o/xelab.exe -debug typical cmd_channel_tb -s cmd_tb_defect -generic_top DEFECT_FIXUP=1 
+Multi-threading is on. Using 22 slave threads.
+Starting static elaboration
+Pass Through NonSizing Optimizer
+Completed static elaboration
+Starting simulation data flow analysis
+Completed simulation data flow analysis
+Time Resolution for simulation is 1ps
+Compiling module work.cmd_channel
+Compiling module work.cmd_channel_tb(DEFECT_FIXUP=1'b1...
+Built simulation snapshot cmd_tb_defect
+--- NEGATIVE CONTROL (DEFECT_FIXUP=1): the bench must FAIL here --- 
+[FAIL] C6a: reply sent for wrong-port frame
+[FAIL] C6a: cmd_err_cnt 0->0 (want +1)
+[FAIL] C6a: rd_req_pulse fired
+[FAIL] C6a: cmd_rx_cnt=5 (want 4)
+[FAIL] C6a: cfg_rd_slot clobbered by rejected frame
+[FAIL] C6b: reply sent for bad-magic frame
+[FAIL] C6b: cmd_err_cnt 0->0 (want +1)
+[FAIL] C6b: rd_req_pulse fired
+[FAIL] C6b: cfg_rd_slot clobbered by rejected frame
+[FAIL] C6c: reply sent for truncated frame
+[FAIL] C6c: cmd_err_cnt 0->0 (want +1)
+[FAIL] C6c: rd_req_pulse fired
+[FAIL] C6d: reply sent for short-length frame
+[FAIL] C6d: cmd_err_cnt 0->0 (want +1)
+[FAIL] C6d: rd_req_pulse fired
+[FAIL] C5b/reply#4: dst MAC mismatch (captured src MAC not used?)
+[FAIL] C5b/reply#4: dst IP mismatch
+[FAIL] C5b/reply#4: dst port=9c45 (want 9c49)
+[FAIL] C5b/reply#4: v16=0011 want 0077
+[FAIL] C9/reply#8: dst MAC mismatch (captured src MAC not used?)
+[FAIL] C9/reply#8: IP id=0009 (want 0006)
+[FAIL] C9/reply#8: dst IP mismatch
+[FAIL] C9/reply#8: dst port=9c49 (want afc8)
+[FAIL] C9/reply#8: opcode echo=02 want 04
+[FAIL] C9/reply#8: v16=0077 want 7605
+[FAIL] C9/reply#8: v16b=0006 want 0005
+[FAIL] C9/reply#8: v16c=0000 want 0001
+[FAIL] C9/reply#9: IP id=000a (want 0007)
+[FAIL] C9/reply#10: IP id=000b (want 0008)
+[FAIL] C9/reply#11: IP id=000c (want 0009)
+[FAIL] C9/reply#12: IP id=000d (want 000a)
+[FAIL] C9/reply#13: IP id=000e (want 000b)
+[FAIL] C9/reply#14: IP id=000f (want 000c)
+[FAIL] C9/reply#15: IP id=0010 (want 000d)
+[FAIL] C9/reply#16: IP id=0011 (want 000e)
+[FAIL] C9/reply#17: IP id=0012 (want 000f)
+[FAIL] C9/reply#18: IP id=0013 (want 0010)
+[FAIL] C9/reply#19: IP id=0014 (want 0011)
+[FAIL] C9/reply#20: IP id=0015 (want 0012)
+[FAIL] C9/reply#21: IP id=0016 (want 0013)
+[FAIL] C9/reply#22: IP id=0017 (want 0014)
+[FAIL] C9/reply#23: IP id=0018 (want 0015)
+[FAIL] C9/reply#24: IP id=0019 (want 0016)
+[FAIL] C9/reply#25: IP id=001a (want 0017)
+[FAIL] C9/reply#26: IP id=001b (want 0018)
+[FAIL] C9/reply#27: IP id=001c (want 0019)
+[FAIL] C9/reply#28: IP id=001d (want 001a)
+[FAIL] C9/reply#29: IP id=001e (want 001b)
+[FAIL] C9/reply#30: IP id=001f (want 001c)
+[FAIL] C9/reply#31: IP id=0020 (want 001d)
+[FAIL] C9/reply#32: IP id=0021 (want 001e)
+[FAIL] C9/reply#33: IP id=0022 (want 001f)
+[FAIL] C9/reply#34: IP id=0023 (want 0020)
+[FAIL] C9/reply#35: IP id=0024 (want 0021)
+[FAIL] C9/reply#36: IP id=0025 (want 0022)
+[FAIL] C9/reply#37: IP id=0026 (want 0023)
+[FAIL] C9/reply#38: IP id=0027 (want 0024)
+[FAIL] C9/reply#39: IP id=0028 (want 0025)
+[FAIL] C9/reply#40: IP id=0029 (want 0026)
+[FAIL] C9/reply#41: IP id=002a (want 0027)
+[FAIL] C9/reply#42: IP id=002b (want 0028)
+[FAIL] C9/reply#43: IP id=002c (want 0029)
+[FAIL] C9/reply#44: IP id=002d (want 002a)
+[FAIL] C9/reply#45: IP id=002e (want 002b)
+[FAIL] C9/reply#46: IP id=002f (want 002c)
+[FAIL] C9/reply#47: IP id=0030 (want 002d)
+[FAIL] C9: cmd_exec_cnt delta 39 (want 40)
+[FAIL] C9: cmd_err_cnt moved (0 -> 1)
+=== prj10 W5 CMD SIM: FAIL (68 errors) ===
+
+****** xsim v2023.1 (64-bit)
+  **** SW Build 3865809 on Sun May  7 15:05:29 MDT 2023
+  **** IP Build 3864474 on Sun May  7 20:36:21 MDT 2023
+  **** SharedData Build 3865790 on Sun May 07 13:33:03 MDT 2023
+    ** Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.
+    ** Copyright 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+
+source xsim.dir/cmd_tb_defect/xsim_script.tcl
+# xsim {cmd_tb_defect} -autoloadwcfg -runall
+Time resolution is 1 ps
+run -all
+[P1] tx_idle=0: command executed but no transmission
+[P2] tx_idle=1: the pending reply goes out
+[P3] READ_SLOT(0x5A)
+[P4] GET_WATERMARK
+[P5] GET_SLOT_MAP
+[P6a] wrong destination port (1234) with correct magic
+[FAIL] C6a: reply sent for wrong-port frame
+[FAIL] C6a: cmd_err_cnt 0->0 (want +1)
+[FAIL] C6a: rd_req_pulse fired
+[FAIL] C6a: cmd_rx_cnt=5 (want 4)
+[FAIL] C6a: cfg_rd_slot clobbered by rejected frame
+[P6b] correct port 1235 but wrong magic
+[FAIL] C6b: reply sent for bad-magic frame
+[FAIL] C6b: cmd_err_cnt 0->0 (want +1)
+[FAIL] C6b: rd_req_pulse fired
+[FAIL] C6b: cfg_rd_slot clobbered by rejected frame
+[P6c] truncated payload (6 bytes sent, header claims 8)
+[FAIL] C6c: reply sent for truncated frame
+[FAIL] C6c: cmd_err_cnt 0->0 (want +1)
+[FAIL] C6c: rd_req_pulse fired
+[P6d] UDP length field says 12 (< 8 payload bytes)
+[FAIL] C6d: reply sent for short-length frame
+[FAIL] C6d: cmd_err_cnt 0->0 (want +1)
+[FAIL] C6d: rd_req_pulse fired
+[P7] non-command UDP traffic is ignored (no counter change)
+[P8] frame without preamble (dst MAC first byte)
+[FAIL] C5b/reply#4: dst MAC mismatch (captured src MAC not used?)
+[FAIL] C5b/reply#4: dst IP mismatch
+[FAIL] C5b/reply#4: dst port=9c45 (want 9c49)
+[FAIL] C5b/reply#4: v16=0011 want 0077
+[P9] CDC random round (eth 8.0ns / user 6.6ns)
+[FAIL] C9/reply#8: dst MAC mismatch (captured src MAC not used?)
+[FAIL] C9/reply#8: IP id=0009 (want 0006)
+[FAIL] C9/reply#8: dst IP mismatch
+[FAIL] C9/reply#8: dst port=9c49 (want afc8)
+[FAIL] C9/reply#8: opcode echo=02 want 04
+[FAIL] C9/reply#8: v16=0077 want 7605
+[FAIL] C9/reply#8: v16b=0006 want 0005
+[FAIL] C9/reply#8: v16c=0000 want 0001
+[FAIL] C9/reply#9: IP id=000a (want 0007)
+[FAIL] C9/reply#10: IP id=000b (want 0008)
+[FAIL] C9/reply#11: IP id=000c (want 0009)
+[FAIL] C9/reply#12: IP id=000d (want 000a)
+[FAIL] C9/reply#13: IP id=000e (want 000b)
+[FAIL] C9/reply#14: IP id=000f (want 000c)
+[FAIL] C9/reply#15: IP id=0010 (want 000d)
+[FAIL] C9/reply#16: IP id=0011 (want 000e)
+[FAIL] C9/reply#17: IP id=0012 (want 000f)
+[FAIL] C9/reply#18: IP id=0013 (want 0010)
+[FAIL] C9/reply#19: IP id=0014 (want 0011)
+[FAIL] C9/reply#20: IP id=0015 (want 0012)
+[FAIL] C9/reply#21: IP id=0016 (want 0013)
+[FAIL] C9/reply#22: IP id=0017 (want 0014)
+[FAIL] C9/reply#23: IP id=0018 (want 0015)
+[FAIL] C9/reply#24: IP id=0019 (want 0016)
+[FAIL] C9/reply#25: IP id=001a (want 0017)
+[FAIL] C9/reply#26: IP id=001b (want 0018)
+[FAIL] C9/reply#27: IP id=001c (want 0019)
+[FAIL] C9/reply#28: IP id=001d (want 001a)
+[FAIL] C9/reply#29: IP id=001e (want 001b)
+[FAIL] C9/reply#30: IP id=001f (want 001c)
+[FAIL] C9/reply#31: IP id=0020 (want 001d)
+[FAIL] C9/reply#32: IP id=0021 (want 001e)
+[FAIL] C9/reply#33: IP id=0022 (want 001f)
+[FAIL] C9/reply#34: IP id=0023 (want 0020)
+[FAIL] C9/reply#35: IP id=0024 (want 0021)
+[FAIL] C9/reply#36: IP id=0025 (want 0022)
+[FAIL] C9/reply#37: IP id=0026 (want 0023)
+[FAIL] C9/reply#38: IP id=0027 (want 0024)
+[FAIL] C9/reply#39: IP id=0028 (want 0025)
+[FAIL] C9/reply#40: IP id=0029 (want 0026)
+[FAIL] C9/reply#41: IP id=002a (want 0027)
+[FAIL] C9/reply#42: IP id=002b (want 0028)
+[FAIL] C9/reply#43: IP id=002c (want 0029)
+[FAIL] C9/reply#44: IP id=002d (want 002a)
+[FAIL] C9/reply#45: IP id=002e (want 002b)
+[FAIL] C9/reply#46: IP id=002f (want 002c)
+[FAIL] C9/reply#47: IP id=0030 (want 002d)
+[FAIL] C9: cmd_exec_cnt delta 39 (want 40)
+[FAIL] C9: cmd_err_cnt moved (0 -> 1)
+[P10] back-to-back commands: 2nd dropped, never overriding
+STAT frames=49 rx=51 err=2 exec=49 rd_trig=18 pulses=18 pw=1 busy_rises=49
+=== prj10 W5 CMD SIM: FAIL (68 errors) ===
+$finish called at time : 398196 ns : File "D:/FPGA/prj/project_10/sim/cmd_channel_tb.sv" Line 668
+exit
+INFO: [Common 17-206] Exiting xsim at Wed Oct  7 19:57:32 2026...
+Vivado Simulator v2023.1
+Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.
+Copyright 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+Running: D:/Xilinx/Vivado/2023.1/bin/unwrapped/win64.o/xelab.exe -debug typical cmd_channel_tb -s cmd_tb_sim 
+Multi-threading is on. Using 22 slave threads.
+Starting static elaboration
+Pass Through NonSizing Optimizer
+Completed static elaboration
+Starting simulation data flow analysis
+Completed simulation data flow analysis
+Time Resolution for simulation is 1ps
+Compiling module work.cmd_channel
+Compiling module work.cmd_channel_tb
+Built simulation snapshot cmd_tb_sim
+
+****** xsim v2023.1 (64-bit)
+  **** SW Build 3865809 on Sun May  7 15:05:29 MDT 2023
+  **** IP Build 3864474 on Sun May  7 20:36:21 MDT 2023
+  **** SharedData Build 3865790 on Sun May 07 13:33:03 MDT 2023
+    ** Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.
+    ** Copyright 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+
+source xsim.dir/cmd_tb_sim/xsim_script.tcl
+# xsim {cmd_tb_sim} -autoloadwcfg -runall
+Time resolution is 1 ps
+run -all
+[P1] tx_idle=0: command executed but no transmission
+[P2] tx_idle=1: the pending reply goes out
+[P3] READ_SLOT(0x5A)
+[P4] GET_WATERMARK
+[P5] GET_SLOT_MAP
+[P6a] wrong destination port (1234) with correct magic
+[P6b] correct port 1235 but wrong magic
+[P6c] truncated payload (6 bytes sent, header claims 8)
+[P6d] UDP length field says 12 (< 8 payload bytes)
+[P7] non-command UDP traffic is ignored (no counter change)
+[P8] frame without preamble (dst MAC first byte)
+[P9] CDC random round (eth 8.0ns / user 6.6ns)
+[P10] back-to-back commands: 2nd dropped, never overriding
+STAT frames=46 rx=47 err=5 exec=46 rd_trig=14 pulses=14 pw=1 busy_rises=46
+=== prj10 W5 CMD SIM: PASS (0 errors) ===
+$finish called at time : 399276 ns : File "D:/FPGA/prj/project_10/sim/cmd_channel_tb.sv" Line 668
+exit
+INFO: [Common 17-206] Exiting xsim at Wed Oct  7 19:57:38 2026...
+=== prj10 W5 CMD SIM: PASS (0 errors) ===

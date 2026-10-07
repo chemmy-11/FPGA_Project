@@ -1,0 +1,19 @@
+List of CLB Tiles
+CLE_M_X53Y75
+CLEL_R_X53Y75
+CLE_M_X56Y75
+CLEL_R_X56Y75
+CLE_M_X55Y67
+CLE_M_X53Y70
+CLEL_R_X53Y70
+CLE_M_X52Y204
+CLEL_R_X52Y204
+
+List of Congested Nets
+u_icmp/u_icmp_tx/ip_head_reg_n_0_[0][13]
+u_mem/u_bridge/len_tab_reg[228]_228[3]
+u_mem/u_bridge/len_tab_reg[231]_231[3]
+u_mem/u_bridge/len_tab_reg[134]_134[9]
+u_icmp/u_icmp_tx/i___124_carry__0_i_27_n_0
+u_mem/u_bridge/len_tab_reg[135]_135[9]
+
