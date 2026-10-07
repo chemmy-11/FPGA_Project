@@ -64,9 +64,12 @@ cd D:\FPGA\prj\project_9; python scripts\udp_verify.py  # 回显一致 12/12
 - 各工程脚本（create/build/program/board_test，幂等）在 `D:\FPGA\prj\project_N\scripts\`。
 - **配套工具 `vivado-mcp`（已随仓库入库）**：MCP 服务，**32 个工具**——会话/Tcl/工程/流程/报告/诊断/CDC/位流探针/IP/波形十类；其中 `parse_xpr`·`parse_bit_header`·`parse_ltx`·`xdc_lint` 为**离线工具**（不启 Vivado）。**上游 = [mapleleavessssssss-wq/vivado-mcp](https://github.com/mapleleavessssssss-wq/vivado-mcp) v0.3.26（Apache-2.0，LICENSE 已随源码入库）**——本仓库副本**零代码改动**、仅目录重组（上游 `src/vivado_mcp/` + 顶层 `scripts/` `skills/` → 平铺入包内；逐字节比对 52 同 / 0 改）。上游基准 **Vivado 2019**，本项目 **2023.1**：离线工具与 Vivado 会话实测可用；**`compare_xci` 不可用**（上游按 XML 版 xci 设计，本项目 2023.1 的 xci 全为 JSON 版）。 仓库内为**可移植副本**（`D:\FPGA\vivado-mcp\`，零本机配置），安装与清单见 `vivado-mcp/README.md`。⚠️ **与下条「工具纪律」里的本机 CLI 壳是两回事**：那层壳是开发者本地设施、不入库。两条硬约束：安装路径必须**纯 ASCII**（中文路径经 Vivado Tcl 的 ANSI 解码会乱码，会话必失败）；Vivado 会话与综合/实现/仿真**全局串行**。
 
-## 当前状态（2026-10-01）
+## 当前状态（2026-10-07）
 
-- 已闭环：M1（08-11）· IBERT 物理层（08-27）· Aurora 链路层（08-31）· 以太网 UDP 网口栈（09-04）· 数据级桥 M2（09-18）· **prj9 双笼真光链路判据全过（09-21，git f7c8be8）** · **会话 JSON 传输质量评测（09-21）**。
+- **DDR 线闭环（2026-10-06，git c27eea3/2465cf4）**：**D1 DDR4 校准双位流全过**（MIG JTAG 报告全绿；例程自带比对测试有自身缺陷链——极性/awlen 跨 4KB/读回错乱，根因未再追，内存正确性以集成位流全链判据为准）；**W3 内存插入联调全过**（T23/T22 亮 · ping 20/20 · UDP 12/12 逐字节 · 10MB 冲击内存桥零丢零错 · 七级差分链逐级闭合）；一条命令验证 `prj_loop/scripts/udp_verify_ddr.py`（四档全 PASS）；截图归档 `截图归档/ddr_*.png` 三张。
+- **过载硬冻结已修复（2026-10-06 晚，git 9f29d7c）**：根因 = udp_tx 忙时丢发送请求→无帧边界 FIFO 字节永久错位（prj9 遗留，板上两次复现+仿真证实）；修复走 **prj_loop 派生副本** `rtl_patch/udp_tx.v`（忙时锁存 pending start + 伴随参数，prj9 原件零改动）；R4 TB 验证：忙帧正确补发/FIFO 清零/零错位；板上重放 pace 13µs 冻结场景**不再冻结**（过载只降速不冻结达成）。
+- **W4 两级内存全环路（进行中，暂停于构建）**：桥② EGRESS 0x0020_0000 + 回程拦截（unpack→桥②→泵B）+ **自研 `axi_arb_2to1` 仲裁器**（SmartConnect/AXI Interconnect 2023.1 均锁 IP Integrator，实测独立生成产物为空壳 → 放弃 IP 互联；仲裁器单元仿真 PASS：双主并发 8 轮写 8:8 完美轮转）；六轮构建排障（MDRV 桥②连线/SC 空壳/端口大小写/bash 转义控制字符）记录在 prj_loop 各 build_w4*.log；**恢复点 = 第七轮构建结果判读 → 烧板 → J4（四档+10MB SHA）**。
+- 已闭环（历史）：M1（08-11）· IBERT 物理层（08-27）· Aurora 链路层（08-31）· 以太网 UDP 网口栈（09-04）· 数据级桥 M2（09-18）· **prj9 双笼真光链路判据全过（09-21，git f7c8be8）** · **会话 JSON 传输质量评测（09-21）**。
 - 评测结论（`json_storm.py`）：质量档 100%+SHA 一致 · 性能档 19.3 Mbps · 容量档送 70 回 22.9 Mbps · 损坏/乱序全程 0。**口径定案（09-29）**：19.3 Mbps = **PC 侧 `time.sleep` 所致**（561 µs/帧 ≈ Windows 高精度定时器 ~500 µs 分辨率；4 进程各 ~17.5 Mbps 反证与 GIL 无关）；22.9 Mbps = **开环冲击下界，非 fabric 结构极限**（设计报告 v0.5 §3.3.2 已修正，旧"串行上限 23 Mbps"归因作废）。待跑判别实验：`json_storm.py --gap-ms 0`。过载触发板端硬冻结（重烧恢复），根因待查——**追线速前必须先修**。详见 [[操作文档/阶段二之十_prj9_传输效率与瓶颈判定实操单_2026-09-29]]。
 - **0.4% 丢失已定案修复**（pack 队列 2→16 深，判决位流差分链算术闭合），全量 10MB **100%+SHA 一致**；真实业务传输层 `json_reliable.py` 验证通过（交付 100%/0 重传）。三域 ILA 判决位流 build9v/w（git d9327bd/0ee2611）。
 - **规划基线变更（09-22）**：**开题报告 v2**《面向边缘多节点协作的 FPGA 高速互联网络平台设计与实现》生效，替代原《面向边缘联邦学习…》；配套 `AI-Infra系统设计/FPGA-AI-Infra-系统设计报告`。三项定案：端点一律**千兆网口**接入（prj7 SFP 承载以太网不再需要）· 板间 = 同 Quad **双 Aurora 核的双 10G 平行链路**（A=X1Y11 / B=X1Y9）· 队列后端原定 **BRAM 多帧优先、DDR4 条件触发**（#13）。
