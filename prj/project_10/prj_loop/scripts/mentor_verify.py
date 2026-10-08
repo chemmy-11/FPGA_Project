@@ -67,12 +67,12 @@ def run_engine(args):
         # 严格档：SET_MODE(RND) 后桥① 不再自动读，写阶段不该有任何回显。
         # MOCK 回环天然回声（模拟器特性），故 mock 下不加此档。
         cmd.append("--no-write-echo")
-    if args.fast:
-        cmd.append("--no-neg")
-    else:
-        # 板卡模式下引擎默认不跑负向轮（只有 mock 才自动开）——正式验证必须显式要求，
+    if args.mode == "fault":
+        # 板卡模式下引擎默认不跑负向轮（只有 mock 才自动开）——异常报错版显式要求，
         # 否则"负向对照真的报异常"这句结论就是未经验证的断言。
         cmd += ["--neg-a", "--neg-b"]
+    else:
+        cmd.append("--no-neg")
     if args.mock:
         cmd.append("--mock")
     print("  [验证引擎] j3_random_read.py  N=%d seed=%d%s"
@@ -156,7 +156,10 @@ def main():
     ap.add_argument("--nslots", type=int, default=16)
     ap.add_argument("--seed", type=int, default=20261007)
     ap.add_argument("--pace-us", type=int, default=1500)
-    ap.add_argument("--fast", action="store_true", help="只跑主轮（跳过负向 A/B）")
+    ap.add_argument("--mode", choices=("normal", "fault"), default="normal",
+                    help="normal=完全正常传输版（默认，只跑主轮 + 速率）; "
+                         "fault=异常报错版（跑负向 A/B，展示判据真的报错）")
+    ap.add_argument("--fast", action="store_true", help="[已并入 --mode normal]")
     ap.add_argument("--mock", action="store_true", help="无板自检（回环端口）")
     ap.add_argument("--pc-ip", default="192.168.1.102",
                     help="PC 侧源网卡 IP（默认 192.168.1.102）。★多网卡机器必带："
@@ -165,7 +168,8 @@ def main():
     args = ap.parse_args()
 
     mode = "MOCK 自检（无板）" if args.mock else "板卡实测"
-    box(["  prj10 内存进环路 · 导师原话验证报告",
+    ver = "完全正常传输版" if args.mode == "normal" else "异常报错版（负向对照）"
+    box(["  prj10 内存进环路 · 导师原话验证报告  【%s】" % ver,
          "  验证对象：把内存读写（特别是随机读写）放进 以太网 <-> 光回环 的整个环路",
          "  运行模式：%s      时间：%s" % (mode, time.strftime("%Y-%m-%d %H:%M:%S"))])
 
@@ -234,7 +238,12 @@ def main():
     print()
 
     show = min(n, 16)
+    # ★判据必须覆盖**全部 N 步**（表格只显示前 show 行，不能拿显示行数当判据基数）
+    full_ok = sum(1 for i in range(len(want))
+                  if i < len(arrival) and arrival[i] == want[i])
     ok_rows = render_table(order, arrival, want, slot0, show)
+    if n > show:
+        print("    （上表只显示前 %d 行；判据统计全部 %d 步）" % (show, n))
     print("    逐帧对应一致：%d/%d %s" % (ok_rows, show, "OK" if ok_rows == show else "XX"))
     print()
 
@@ -254,6 +263,28 @@ def main():
     print("    字节差异   : %d" % byte_diff)
     print()
 
+    hr()
+    print("(5) 「传输速率 / 延迟」（量化参考；导师 Q5：本期暂不要求提高端口速率）")
+    size = int(summary.get("frame_size", 64))
+    wdur = mc.get("write_dur_s")
+    if wdur:
+        fps = n / float(wdur)
+        mbps = n * size * 8 / float(wdur) / 1e6
+        print("    写阶段      : %d 帧 / %.1f ms = %.0f 帧/秒（%.3f Mbps，帧长 %dB）"
+              % (n, float(wdur) * 1000.0, fps, mbps, size))
+        print("                  ↑ 受上位机 pace=%dus 限速，**不是硬件极限**；" % args.pace_us)
+        print("                    要压速率用 --pace-us 200（更快）或 5000（更慢）")
+    rtts = [float(v) for v in (mc.get("read_rtt_ms") or [])]
+    if rtts:
+        avg = sum(rtts) / len(rtts)
+        print("    读往返延迟  : %d 次 READ_SLOT，命令+数据往返 平均 %.2f ms / 最小 %.2f / 最大 %.2f"
+              % (len(rtts), avg, min(rtts), max(rtts)))
+        if avg > 0:
+            print("                  串行读吞吐 ≈ %.0f 帧/秒（含等待；受 RTT 限制）" % (1000.0 / avg))
+    print("    链路含义    : 单帧要穿 以太网栈→泵A→DDR4 槽区→Aurora 10G 光口→光纤往返→")
+    print("                  解包→第二级 DDR4→泵B→RGMII，两级内存各一次读写；")
+    print("                  延迟主要来自命令往返与两级存储转发，与端口线速(1Gbps)无关。")
+    print()
     hr("=")
     print(" 判据核对（本脚本独立复核，不采信引擎的 PASS 字样）")
     hr()
@@ -261,7 +292,7 @@ def main():
         ("J3 (a) 读出顺序 != 写入顺序",
          "逆序对 %d" % inv, inv > 0),
         ("J3 (b) 每帧内容与槽严格对应",
-         "%d/%d 逐步一致" % (ok_rows, show), ok_rows == show),
+         "%d/%d 逐步一致" % (full_ok, n), full_ok == n),
         ("J3' 集合级可取出性",
          "收 %d/期望 %d 缺 %d 多 %d 字节差 %d" % (len(rec), len(exp), len(missing), extra, byte_diff),
          set_equal and not missing and extra == 0 and byte_diff == 0),
@@ -287,15 +318,45 @@ def main():
         print("  " + pad(label, 40) + pad(detail, 30) + ("OK" if good else "XX"))
     hr()
 
-    all_ok = (inv > 0 and ok_rows == show and set_equal and not missing
+    all_ok = (inv > 0 and full_ok == n and set_equal and not missing
               and byte_diff == 0 and extra == 0 and all(g for _, g, _ in neg))
+    if args.mode == "fault":
+        hr("=")
+        print(" 异常报错版 · 负向对照明细（证明判据真的会报错，不是恒真）")
+        hr()
+        for key, title, desc in (
+            ("负向A", "负向A · 故意漏读 1 个槽",
+             "构造：从读取计划里删掉 1 个槽（命令数 = N-1）。判据必须报出「恰好缺 1 帧」并指名哪个 seq。"),
+            ("负向B", "负向B · 重复读同一个槽",
+             "构造：对同一槽发两次 READ_SLOT（命令数 = N+1）。第二次读必须观测到「空」（一次性取走语义），集合仍相等。"),
+        ):
+            c = cases.get(key)
+            if not c:
+                continue
+            print()
+            print(" 【%s】" % title)
+            print("   %s" % desc)
+            miss = c.get("missing")
+            mf = c.get("missing_frames") or []
+            print("   实测：命令数 %s（= N%s1）· 实取 %s 帧 · 缺 %s · 多 %s · 字节差异 %s"
+                  % (c.get("cmd_plan"), "-" if key == "负向A" else "+",
+                     c.get("n_echo"), miss, c.get("extra"), c.get("byte_diff")))
+            if key == "负向A":
+                print("   报错内容：缺 %s 帧，缺的是 seq=%s  <- 判据真的报出来了" % (miss, mf))
+                print("   判定：%s" % ("OK 判据有效（缺帧被抓到）" if miss == 1 else "XX 未按预期报缺 1 帧"))
+            else:
+                print("   报错内容：第二次读同一槽观测到「空」%s 次  <- 一次性取走语义生效" % c.get("dup_empty"))
+                print("   判定：%s" % ("OK 判据有效（重复读不产生额外数据帧）"
+                                     if (c.get("extra", 0) == 0 and miss == 0) else "XX 出现多余/缺失帧"))
+        print()
     if args.mock:
         print("  注意：本次为 MOCK 自检（无板卡，回环端口），仅用于校验本报告脚本的渲染与复核逻辑；")
         print("        mock 回环天然会在写阶段回声，故未启用严格档（--no-write-echo），")
         print("        引擎判决也因此不代表真实结论。真实结论请以板卡实测为准：")
         print("            python scripts/mentor_verify.py")
         print()
-    if all_ok:
+    if all_ok and args.mode == "normal":
+        print("  ★ 完全正常传输：PASS —— 导师原话四环节全部取到证据，判据 J3 / J3′ 全过")
         print("  ★ 结论：导师原话所要求的「把内存读写、特别是随机读写放进整个环路」")
         print("          已在本板实现并通过验证：")
         print("            · 数据确实经 DDR4 存储转发（先写 -> 按地址读），不是 FIFO 直通")
@@ -305,6 +366,10 @@ def main():
             print("            · 负向对照真的报了异常 => 判据不是恒真")
         else:
             print("            · （本次未跑负向对照，未验证判据非恒真——用完整档重跑）")
+    elif all_ok and args.mode == "fault":
+        print("  ★ 异常报错版：判据有效 —— 两次负向构造都真的报出了异常（非恒真）")
+        print("  ★ 说明：负向对照是「故意制造异常来验证判据」，必须报错才算通过；")
+        print("          正常传输请用 --mode normal 单独跑一版。")
     else:
         print("  XX 结论：判据未全部满足，详见上方 XX 项与引擎日志")
     hr("=")

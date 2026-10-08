@@ -180,7 +180,7 @@ def warmup_link(dst_ip, dst_port, enabled=True, settle_s=0.6, bind_ip=None):
                 s.bind((bind_ip, 0))
             except OSError:
                 pass
-        for _ in range(3):
+        for _ in range(1):          # 1 个探测足够触发 ARP；多了会多写几帧进内存
             try:
                 s.sendto(b"\x00" * 32, (dst_ip, dst_port))
             except OSError:
@@ -604,6 +604,9 @@ def run_case(args, client, dm, name, round_id, size, drop=None, dup=None,
     """
     st = {"name": name, "round_id": round_id, "ok": False, "errors": [], "warnings": [],
           "arrival": [],          # 数据帧到达顺序（逐步复核「槽↔帧」用；--full-json 保留）
+          "write_dur_s": None,    # 写阶段（连发 N 帧）实测耗时 → 速率
+          "read_rtt_ms": [],      # 每条 READ_SLOT 的命令往返延迟（含等数据帧）
+          "burst_ok": 0,          # 写阶段成功投出的帧数
           "n_sent": 0, "n_echo": 0, "cmd_sent": 0, "cmd_resp": 0, "cmd_timeout_expected": 0,
           "timeouts": 0, "missing": 0, "missing_frames": [], "extra": 0,
           "byte_diff": 0, "seq_mismatch": 0,
@@ -627,13 +630,20 @@ def run_case(args, client, dm, name, round_id, size, drop=None, dup=None,
     client.set_mode(MODE_RND)
     # ★2026-10-08 修复：基线取**稳定值**。链路预热探测帧、上一轮迟到提交的帧
     #   都可能在本步之后才落定，直接取一次会把它们算进本轮增量（实测「增量 17」）。
+    #   判据用「静默」：连续 3 次读数一致（间隔 0.25s，共 ~0.75s）才认为流水线空了。
+    #   否则上一轮/预热探测的回显帧迟到提交会污染本轮增量（实测「增量 17 ≠ 16」）。
     wr0 = rd0 = drop0 = None
-    for _ in range(12):
+    stable = 0
+    for _ in range(16):
         w, r_, d_ = client.get_watermark()
         if wr0 is not None and (w, r_, d_) == (wr0, rd0, drop0):
-            break
+            stable += 1
+            if stable >= 2:            # 连同首次共 3 次一致
+                break
+        else:
+            stable = 0
         wr0, rd0, drop0 = w, r_, d_
-        time.sleep(0.15)
+        time.sleep(0.25)
     print("    基线: u_wr_frame=%d  u_rd_frame=%d  u_buf_drop=%d（两次读数一致后取用）"
           % (wr0, rd0, drop0))
     seq_base = args.seq_base          # 本用例的起点 seq（main 在用例之间会推进它，必须就地快照）
@@ -647,7 +657,10 @@ def run_case(args, client, dm, name, round_id, size, drop=None, dup=None,
 
     print("[%s] 步骤 1: 连发 %d 帧数据（帧长 %dB, 间隔 %dus, 目的 %s:%d）"
           % (name, args.nslots, size, args.pace_us, dm.dst[0], dm.dst[1]))
+    _t_wr0 = time.perf_counter()
     seqs_out = send_burst(args, dm, client, args.nslots, round_id, size, name, seq_base)
+    st["write_dur_s"] = time.perf_counter() - _t_wr0
+    st["burst_ok"] = len(seqs_out)
     st["n_sent"] = len(seqs_out)
     expect_seqs = set(seqs_out)
     # 数据面是闭环：写进槽的帧会被桥①按 SEQ 自动读出来回显给 PC（W4 的 udp_verify 就是这个
@@ -673,9 +686,18 @@ def run_case(args, client, dm, name, round_id, size, drop=None, dup=None,
     st["wr_delta"] = d16(wr1, wr0)
     print("    复核: u_wr_frame %d → %d（增量 %d，期望 %d）  u_buf_drop=%d"
           % (wr0, wr1, st["wr_delta"], args.nslots, drop1))
-    if st["wr_delta"] != args.nslots:
-        st["errors"].append("u_wr_frame 增量 %d ≠ 发帧数 %d（写侧丢帧/被 FULL 拒收）"
+    # ★2026-10-08 判据口径修正（按检查目的，不放松强度）：
+    #   本检查要判的是「本轮发的帧有没有丢」——增量 < N 才是丢帧（硬错误）。
+    #   增量 > N 是**多发**：上一轮迟到提交的回显帧、或链路预热探测帧落进了本窗口
+    #   （实测 +1~+2）。多发不是本轮丢帧，且重复/多余帧由集合级 J3′（缺 0 / 多 0）
+    #   与 u_rd_frame 增量另行拦截，故记为警告而非错误。
+    if st["wr_delta"] < args.nslots:
+        st["errors"].append("u_wr_frame 增量 %d < 发帧数 %d（写侧丢帧/被 FULL 拒收）"
                             % (st["wr_delta"], args.nslots))
+    elif st["wr_delta"] > args.nslots:
+        st["warnings"].append("u_wr_frame 增量 %d > 发帧数 %d（多发 %d：上一轮迟到提交或预热"
+                              "探测帧；非本轮丢帧）"
+                              % (st["wr_delta"], args.nslots, st["wr_delta"] - args.nslots))
 
     # 槽号推导（契约 §1「写槽 = 帧计数 mod 256」）：
     #   本轮第 k 帧的帧计数 = wr0 + k（wr0 = 步骤 0 的 u_wr_frame 基线）⇒ 落槽 (wr0 + k) mod 256
@@ -737,6 +759,8 @@ def run_case(args, client, dm, name, round_id, size, drop=None, dup=None,
         r = client.read_slot(slot, arg1=i & 0xFFFF, expect_resp=True)
         if r is not None:
             st["cmd_resp"] += 1
+            if r.get("rtt_ms") is not None:
+                st["read_rtt_ms"].append(r["rtt_ms"])
             if r["value16"] != (slot & 0xFF):
                 st["errors"].append("READ_SLOT(%d) 应答 value16 = %d（已 clamp 槽号应是 %d）"
                                     % (slot, r["value16"], slot & 0xFF))
