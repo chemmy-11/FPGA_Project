@@ -61,6 +61,8 @@ def run_engine(args):
            "--seed", str(args.seed),
            "--pace-us", str(args.pace_us),
            "--full-json", "--json-out", tmp]
+    if args.pc_ip:
+        cmd += ["--src-ip", args.pc_ip]      # 显式绑定源网卡，避免多网卡路由误选
     if not args.mock:
         # 严格档：SET_MODE(RND) 后桥① 不再自动读，写阶段不该有任何回显。
         # MOCK 回环天然回声（模拟器特性），故 mock 下不加此档。
@@ -156,6 +158,10 @@ def main():
     ap.add_argument("--pace-us", type=int, default=1500)
     ap.add_argument("--fast", action="store_true", help="只跑主轮（跳过负向 A/B）")
     ap.add_argument("--mock", action="store_true", help="无板自检（回环端口）")
+    ap.add_argument("--pc-ip", default="192.168.1.102",
+                    help="PC 侧源网卡 IP（默认 192.168.1.102）。★多网卡机器必带："
+                         "同时接了 WLAN 时 Windows 可能把到板卡的流量路由到 WLAN，"
+                         "表现为命令无应答/单播数据帧丢失——这不是板卡问题")
     args = ap.parse_args()
 
     mode = "MOCK 自检（无板）" if args.mock else "板卡实测"

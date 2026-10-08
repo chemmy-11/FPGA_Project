@@ -613,6 +613,17 @@ def run_case(args, client, dm, name, round_id, size, drop=None, dup=None,
           "write_echo": 0, "write_echo_foreign": 0, "late_extra": 0, "dup_empty": 0}
     print("-" * 74)
     print("[%s] 步骤 0: SET_MODE(RND) + GET_WATERMARK 取基线" % name)
+    # ★2026-10-08 关键修复（RND 模式的固有副作用）：
+    #   RND 下桥① 不自动读 ⇒ 板子**无法主动发任何帧给 PC**（ARP 应答也要走
+    #   「内存→泵B」这条路）⇒ PC 侧邻居表老化到 Unreachable ⇒ **单播数据帧被
+    #   直接丢弃**（实测 u_wr_frame 增量只有 1~3，而广播命令一直正常，因为广播
+    #   不需要 ARP）。这正是「每组第一轮必失败、后续通过」的真因。
+    #   对策：每轮开测前先切回 SEQ 让板子能应答 ARP → UDP 探测刷新邻居表 →
+    #   再切 RND 正式开测。（若 PC 侧已配静态邻居项，本步自然秒过。）
+    if not args.mock:
+        client.set_mode(MODE_SEQ)
+        warmup_link(dm.dst[0], dm.dst[1], enabled=not args.no_warmup,
+                    bind_ip=getattr(args, "_bind_ip", None), settle_s=0.5)
     client.set_mode(MODE_RND)
     # ★2026-10-08 修复：基线取**稳定值**。链路预热探测帧、上一轮迟到提交的帧
     #   都可能在本步之后才落定，直接取一次会把它们算进本轮增量（实测「增量 17」）。
@@ -1294,11 +1305,9 @@ def main(argv=None):
 
         cases = {}
 
-        # 数据面链路预热（ARP）：见 warmup_link 注释——不加会把 PC 侧 ARP 老化
-        # 误判成板卡丢帧（实测 16 帧只到 2 帧）。--no-warmup 可关闭。
-        if not args.mock:
-            warmup_link(dst_ip, dst_port, enabled=not args.no_warmup,
-                        bind_ip=command_ip)
+        # 预热按「每轮开测前」在 run_case 步骤 0 内做（需先切 SEQ 才行，见那里的注释）；
+        # 这里只把选定源地址记到 args 供其使用。
+        args._bind_ip = command_ip
 
         # ================= 主轮（契约 §4.1） =================
         st_main = run_case(args, client, dm, "主轮", 1, args.size)
@@ -1419,6 +1428,14 @@ def main(argv=None):
         print("J3_RANDOM_READ: FAIL (用户中断)（0 errors 口径）")
         return 130
     finally:
+        # ★收尾恢复 SEQ：RND 下板子无法应答 ARP（应答帧要经"内存→泵B"，而 RND
+        #   不自动读），留着会让 PC 邻居表老化成 Unreachable ⇒ 下次跑第一轮必失败
+        #   （实测规律）。切回 SEQ 后板子能正常收发，链路与 ARP 都保持可用。
+        if client is not None and not args.mock:
+            try:
+                client.set_mode(MODE_SEQ)
+            except Exception:
+                pass
         if mock:
             mock.close()
             if mock.err:
