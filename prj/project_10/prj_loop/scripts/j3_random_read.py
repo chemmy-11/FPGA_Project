@@ -67,6 +67,7 @@ import os
 import random
 import socket
 import struct
+import subprocess
 import sys
 import threading
 import time
@@ -152,6 +153,46 @@ class Tee:
 
 
 # --------------------------------------------------------------- 帧载荷编解码
+
+def warmup_link(dst_ip, dst_port, enabled=True, settle_s=0.6, bind_ip=None):
+    """数据面链路预热：把 PC 侧 ARP 表对板卡 IP 解析好（★2026-10-08 上板实证）。
+
+    【为什么必须做】数据帧是**单播**到板卡 IP。PC 侧 ARP 条目老化/缺失时，
+    Windows 在 ARP 解析窗口内发出的帧直接丢弃。实测：清掉 ARP 条目后立即发
+    16 帧（间隔 1.5ms，共 24ms），板内只收到 2 帧（u_wr_frame 增量 = 2，
+    u_buf_drop = 0 —— 帧根本没到板卡），表现为"每次重跑的第一轮必失败"的**假故障**。
+    预热后同样条件稳定 16/16。
+
+    【为什么用 UDP 而不是 ping】RND 模式下桥① 不再自动读，ICMP 回包会被写进
+    内存取不出来 —— ping 必然无应答，无法完成 ARP 解析。故用 UDP 单播探测：
+    目的端口是数据面端口，探测包会被板卡正常回显（等价于多写几帧，随后
+    重新取基线即可吸收），代价可忽略。
+    """
+    if not enabled:
+        return
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.settimeout(0.3)
+        if bind_ip:
+            # ★必须绑定与数据面相同的源地址：否则 OS 可能按默认路由选另一张网卡
+            #   （多网卡机器实测：探测走 WLAN）→ 目标网卡的 ARP 根本没被预热。
+            try:
+                s.bind((bind_ip, 0))
+            except OSError:
+                pass
+        for _ in range(3):
+            try:
+                s.sendto(b"\x00" * 32, (dst_ip, dst_port))
+            except OSError:
+                pass
+            time.sleep(0.05)
+        s.close()
+        time.sleep(settle_s)     # 等 ARP 解析 + 探测帧提交落定（随后重取基线）
+        print("链路预热: UDP 探测 %s:%d x3（源 %s，ARP 解析 %.1fs 后取基线）"
+              % (dst_ip, dst_port, bind_ip or "auto", settle_s))
+    except Exception as e:
+        print("链路预热: 跳过（%s）" % e)
+
 
 def build_payload(seq, round_id, size):
     """构造第 seq 帧的完整载荷：seq(4B LE) + [round(1B) | k16(2B LE) | 校验(1B)] + 递增模式。
@@ -291,6 +332,21 @@ class CmdClient:
         expect_resp=False 用于「明知没有应答」的场景（负向 B 的重复读槽）。"""
         pkt = self.pack(opcode, arg0, arg1)
         self.n_cmd += 1
+        # ★2026-10-08 修复：发命令前**排空滞留应答**。
+        #   负向 B 的「重复读槽」用 expect_resp=False 发出、故意不读走应答；
+        #   该应答会滞留，被下一条命令误配 ⇒ value16 整体错位一拍
+        #   （实测：READ_SLOT(100) 应答 value16=90 —— 正是上一条的槽号）。
+        #   这是测试工具自身的配对缺陷，不是板卡行为。
+        try:
+            self.sock.settimeout(0)
+            while True:
+                stale, _a = self.sock.recvfrom(2048)
+                if len(stale) >= 5 and stale[0:4] == RESP_MAGIC:
+                    self.stray += 1
+        except (BlockingIOError, socket.timeout, OSError):
+            pass
+        finally:
+            self.sock.settimeout(self.timeout)
         if not expect_resp:
             self.sock.sendto(pkt, self.dst)
             self.n_sent += 1
@@ -547,6 +603,7 @@ def run_case(args, client, dm, name, round_id, size, drop=None, dup=None,
       → 生成置换 → 逐条 READ_SLOT 并收对应数据帧 → 判 J3/J3' → GET_WATERMARK 终值
     """
     st = {"name": name, "round_id": round_id, "ok": False, "errors": [], "warnings": [],
+          "arrival": [],          # 数据帧到达顺序（逐步复核「槽↔帧」用；--full-json 保留）
           "n_sent": 0, "n_echo": 0, "cmd_sent": 0, "cmd_resp": 0, "cmd_timeout_expected": 0,
           "timeouts": 0, "missing": 0, "missing_frames": [], "extra": 0,
           "byte_diff": 0, "seq_mismatch": 0,
@@ -557,8 +614,17 @@ def run_case(args, client, dm, name, round_id, size, drop=None, dup=None,
     print("-" * 74)
     print("[%s] 步骤 0: SET_MODE(RND) + GET_WATERMARK 取基线" % name)
     client.set_mode(MODE_RND)
-    wr0, rd0, drop0 = client.get_watermark()
-    print("    基线: u_wr_frame=%d  u_rd_frame=%d  u_buf_drop=%d" % (wr0, rd0, drop0))
+    # ★2026-10-08 修复：基线取**稳定值**。链路预热探测帧、上一轮迟到提交的帧
+    #   都可能在本步之后才落定，直接取一次会把它们算进本轮增量（实测「增量 17」）。
+    wr0 = rd0 = drop0 = None
+    for _ in range(12):
+        w, r_, d_ = client.get_watermark()
+        if wr0 is not None and (w, r_, d_) == (wr0, rd0, drop0):
+            break
+        wr0, rd0, drop0 = w, r_, d_
+        time.sleep(0.15)
+    print("    基线: u_wr_frame=%d  u_rd_frame=%d  u_buf_drop=%d（两次读数一致后取用）"
+          % (wr0, rd0, drop0))
     seq_base = args.seq_base          # 本用例的起点 seq（main 在用例之间会推进它，必须就地快照）
     st["seq_base"] = seq_base
     if args.check_slot_map:
@@ -586,7 +652,13 @@ def run_case(args, client, dm, name, round_id, size, drop=None, dup=None,
     if not args.expect_write_echo and echo:
         st["errors"].append("--no-write-echo 下收到 %d 帧写阶段回显" % len(echo))
 
-    wr1, rd1, drop1 = client.get_watermark()
+    # ★2026-10-08 修复：等增量**到齐**再判（最后一帧的提交可能比 echo 排空晚一拍）。
+    wr1 = rd1 = drop1 = None
+    for _ in range(12):
+        wr1, rd1, drop1 = client.get_watermark()
+        if d16(wr1, wr0) >= args.nslots:
+            break
+        time.sleep(0.15)
     st["wr_delta"] = d16(wr1, wr0)
     print("    复核: u_wr_frame %d → %d（增量 %d，期望 %d）  u_buf_drop=%d"
           % (wr0, wr1, st["wr_delta"], args.nslots, drop1))
@@ -660,6 +732,7 @@ def run_case(args, client, dm, name, round_id, size, drop=None, dup=None,
         status, seq, data, addr = dm.read_frame(args.timeout_ms / 1000.0, exp_seq, slot)
         if status == "ok":
             seen[seq] = seen.get(seq, 0) + 1
+            st["arrival"].append(seq)
             exp_payload = build_payload(exp_seq, round_id, size)
             if data != exp_payload:
                 st["byte_diff"] += 1
@@ -1095,6 +1168,12 @@ def parse_args(argv=None):
     p.add_argument("--log", default=None, help="日志文件（UTF-8），例如 j3_mock_selftest.log")
     p.add_argument("--json-out", default=None, help="把 JSON 汇总另存到文件（便于入库）")
     p.add_argument("--quiet", action="store_true", help="少打印（逐条明细只打首尾）")
+    p.add_argument("--no-warmup", action="store_true",
+                   help="跳过数据面链路预热（默认先 ping 一次把 ARP 表预热，"
+                        "避免 PC 侧 ARP 老化被误判成板卡丢帧）")
+    p.add_argument("--full-json", action="store_true",
+                   help="JSON 汇总保留完整数组（read_order/expected/received）"
+                        "——供展示层/报告复核，默认瘦身只留 SHA 指纹")
     a = p.parse_args(argv)
 
     if not (1 <= a.nslots <= NSLOTS_MAX):
@@ -1215,6 +1294,12 @@ def main(argv=None):
 
         cases = {}
 
+        # 数据面链路预热（ARP）：见 warmup_link 注释——不加会把 PC 侧 ARP 老化
+        # 误判成板卡丢帧（实测 16 帧只到 2 帧）。--no-warmup 可关闭。
+        if not args.mock:
+            warmup_link(dst_ip, dst_port, enabled=not args.no_warmup,
+                        bind_ip=command_ip)
+
         # ================= 主轮（契约 §4.1） =================
         st_main = run_case(args, client, dm, "主轮", 1, args.size)
         ok_main = check_main(st_main, args)
@@ -1273,10 +1358,12 @@ def main(argv=None):
                 ",".join(str(v) for v in vals).encode("ascii")).hexdigest()[:16]
 
         def slim(v):
-            """用例统计瘦身：大数组 → 计数 + SHA256 前 16 位（集合是否相等一看便知）。"""
-            d = {kk: vv for kk, vv in v.items()
-                 if kk not in ("read_order", "expected_frames", "received_frames",
-                               "missing_frames", "cmd_plan")}
+            """用例统计瘦身：大数组 → 计数 + SHA256 前 16 位（集合是否相等一看便知）。
+            --full-json 时保留完整数组，供展示层逐帧复核。"""
+            drop = () if args.full_json else (
+                "read_order", "expected_frames", "received_frames",
+                "missing_frames", "cmd_plan", "arrival")
+            d = {kk: vv for kk, vv in v.items() if kk not in drop}
             exp, rec = v.get("expected_frames") or [], v.get("received_frames") or []
             d["expected_n"] = len(exp)
             d["received_n"] = len(rec)
@@ -1313,7 +1400,8 @@ def main(argv=None):
         if args.json_out:
             try:
                 with open(args.json_out, "w", encoding="utf-8", newline="\n") as fh:
-                    json.dump(summary, fh, ensure_ascii=False, indent=2)
+                    json.dump(summary, fh, ensure_ascii=False, indent=2,
+                              default=str)
                 print("JSON 汇总已写: %s" % args.json_out)
             except OSError as e:
                 print("warn: --json-out 写入失败 %s: %s" % (args.json_out, e))

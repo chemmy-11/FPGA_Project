@@ -20,7 +20,10 @@
 //   C4  GET_SLOT_MAP     : v16=u_wr_frame, v16b=u_wr_frame%256, v16c=1
 //   C5  frame integrity  : every reply = 66 gapless bytes, eth/ip/udp header
 //                          fields, IP checksum valid, FCS == independent
-//                          reference CRC-32 (LE order) and residue 0x2144DF1C
+//                          reference CRC-32 (LE order) and residue 0x2144DF1C,
+//                          ★ plus the Ethernet MINIMUM FRAME guard (>=64 B on
+//                          the wire) -- its absence let a runt-frame bug pass
+//                          this TB and fail only on hardware (2026-10-08).
 //   C6  negatives        : wrong port / wrong magic / truncated payload are
 //                          rejected: cmd_err_cnt +1, NO reply, NO rd_req_pulse
 //   C7  non-command UDP  : port 1234 data frame is ignored (no counter change)
@@ -288,10 +291,19 @@ module cmd_channel_tb #(
         logic [7:0]  f0, f1, f2, f3;
         string pfx;
         pfx = $sformatf("%s/reply#%0d", tag, fi);
-        if (frame_len[fi] != 66) begin
-            fail($sformatf("%s: length %0d (expected 66)", pfx, frame_len[fi]));
+        if (frame_len[fi] != 72) begin
+            fail($sformatf("%s: length %0d (expected 72)", pfx, frame_len[fi]));
             return;
         end
+        // ★ 以太网最小帧护栏（2026-10-08 上板实证的 runt 缺陷）:
+        //   线路上(不含前导码)必须 >= 64 字节, 否则网卡硬件静默丢弃 runt,
+        //   表现为"板内 ILA 一切正常、PC 收不到任何包、网卡错误计数 0"。
+        if ((frame_len[fi] - 8) < 64)
+            fail($sformatf("%s: on-wire length %0d < 64 -> RUNT (NIC drops silently)",
+                 pfx, frame_len[fi] - 8));
+        for (int i = 62; i <= 67; i++)
+            if (cap[fi][i] !== 8'h00)
+                fail($sformatf("%s: padding[%0d]=%02x (want 00)", pfx, i, cap[fi][i]));
         // preamble + eth header
         for (int i = 0; i < 7; i++)
             if (cap[fi][i] !== 8'h55) fail($sformatf("%s: preamble[%0d]=%02x", pfx, i, cap[fi][i]));
@@ -352,15 +364,15 @@ module cmd_channel_tb #(
             fail($sformatf("%s: v16c=%04x want %04x", pfx, {cap[fi][61], cap[fi][60]}, e_v16c));
         // FCS: independent reference + residue
         c = 32'hFFFF_FFFF;
-        for (int i = 8; i <= 61; i++) c = crc_byte(c, cap[fi][i]);
+        for (int i = 8; i <= 67; i++) c = crc_byte(c, cap[fi][i]);
         fcs = c ^ 32'hFFFF_FFFF;
         f0 = fcs[7:0]; f1 = fcs[15:8]; f2 = fcs[23:16]; f3 = fcs[31:24];
-        if (cap[fi][62] !== f0 || cap[fi][63] !== f1 ||
-            cap[fi][64] !== f2 || cap[fi][65] !== f3)
+        if (cap[fi][68] !== f0 || cap[fi][69] !== f1 ||
+            cap[fi][70] !== f2 || cap[fi][71] !== f3)
             fail($sformatf("%s: FCS %02x %02x %02x %02x want %02x %02x %02x %02x",
-                 pfx, cap[fi][62], cap[fi][63], cap[fi][64], cap[fi][65], f0, f1, f2, f3));
+                 pfx, cap[fi][68], cap[fi][69], cap[fi][70], cap[fi][71], f0, f1, f2, f3));
         c = 32'hFFFF_FFFF;
-        for (int i = 8; i <= 65; i++) c = crc_byte(c, cap[fi][i]);
+        for (int i = 8; i <= 71; i++) c = crc_byte(c, cap[fi][i]);
         if ((c ^ 32'hFFFF_FFFF) !== 32'h2144_DF1C)
             fail($sformatf("%s: FCS residue != 0x2144DF1C", pfx));
         exp_id = exp_id + 1;

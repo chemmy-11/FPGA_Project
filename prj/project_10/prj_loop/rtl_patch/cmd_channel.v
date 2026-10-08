@@ -44,7 +44,16 @@
 //   [42..49] UDP header: src port 1235 | dst port = captured src port |
 //            len 20 | cksum 0000 (IPv4 allows 0 = not computed)
 //   [50..61] 12-byte payload: "P10R" | opcode | status | v16 | v16b | v16c (LE)
-//   [62..65] FCS
+//   [62..67] 6-byte Ethernet PADDING (00)  <-- ★必需
+//   [68..71] FCS (covers bytes 8..67)
+//
+// ★ 为什么必须有填充（2026-10-08 上板实证的 runt 缺陷）：
+//   以太网最小帧 = 64 字节（不含前导码/SFD）。本应答帧在加填充前
+//   线路上只有 58 字节（6+6+2 以太头 + 20 IP + 8 UDP + 12 载荷 + 4 FCS），
+//   **网卡在硬件层直接丢弃 runt 帧** —— 板内一切正常（ILA 实测 resp_busy
+//   高 68 拍、FCS 经独立参考校验），PC 却收不到任何包且网卡错误计数为 0。
+//   按 RFC 894，填充**不计入** IP total length（保持 40）与 UDP length（保持 20），
+//   仅参与 FCS 计算。填充后线路长度 = 8+14+20+8+12+6+4 = 72B = 8 前导 + 64B 帧 ✓
 //
 // TX takeover timing (Appendix v1.1): resp_busy is raised only after tx_idle,
 // then ONE settling cycle is spent before the first byte so that the
@@ -116,9 +125,9 @@ localparam [2:0] U_IDLE  = 3'd0, U_PULSE = 3'd1, U_PULSE2 = 3'd2, U_RESP = 3'd3,
                  U_WREQL = 3'd4, U_WBACK = 3'd5, U_WBACKL = 3'd6;
 
 // frame geometry
-localparam [6:0] FRM_BODY_END = 7'd61;     // last body byte index
-localparam [6:0] FRM_LAST     = 7'd65;     // last byte index (4th FCS byte)
-localparam [6:0] CRC_FIRST    = 7'd8;      // FCS covers bytes 8..61
+localparam [6:0] FRM_BODY_END = 7'd67;     // last body byte index (incl. 6B pad)
+localparam [6:0] FRM_LAST     = 7'd71;     // last byte index (4th FCS byte)
+localparam [6:0] CRC_FIRST    = 7'd8;      // FCS covers bytes 8..67 (60 B >= min frame)
 
 //=============================================================================
 // CRC32 helper: identical equations to the official crc32_d8.v (official file
@@ -674,9 +683,9 @@ end
 //=============================================================================
 wire [6:0] ti_next   = (ti == FRM_LAST) ? FRM_LAST : (ti + 7'd1);
 wire [7:0] ti_next_b = (ti_next <= FRM_BODY_END) ? byte_at(ti_next) :
-                       (ti_next == 7'd62) ? fcs_byte(2'd0) :
-                       (ti_next == 7'd63) ? fcs_byte(2'd1) :
-                       (ti_next == 7'd64) ? fcs_byte(2'd2) : fcs_byte(2'd3);
+                       (ti_next == 7'd68) ? fcs_byte(2'd0) :
+                       (ti_next == 7'd69) ? fcs_byte(2'd1) :
+                       (ti_next == 7'd70) ? fcs_byte(2'd2) : fcs_byte(2'd3);
 
 always @(posedge clk_eth or negedge rst_eth_n) begin
     if(!rst_eth_n) begin

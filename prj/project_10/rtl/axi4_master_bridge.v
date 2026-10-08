@@ -244,7 +244,28 @@ module axi4_master_bridge #(
     reg         w_beat_full, w_slotfull;
     reg [3:0]   w_drain_wait;           // W2-review D2: W_DRAIN liveness bound
 
-    wire [7:0]  w_slot_next = stat_wm[7:0];
+    //=========================================================================
+    // ★W5 FIX (2026-10-08, 上板实测死锁) —— 写槽游标与提交计数解耦
+    //
+    // 缺陷现场（ILA 实测）：dbg_mem_u_wr=334（user 域"接受"帧数）而
+    //   dbg_mem_wm=278（ui 域"提交"帧数），发散 56 帧；此后 READ_SLOT 命令
+    //   全部被应答（通道正常）但读回 0 帧 —— 桥① 永久卡死。
+    //
+    // 机制：写槽号取自 stat_wm[7:0]，而 stat_wm 只在 B 响应（提交成功）时 +1。
+    //   RND 模式下没有自动读，未被读走的槽会一直 FULL；一旦游标推进到某个
+    //   未读满槽，w_no_room=1 → 该帧被拒 → stat_wm 不动 → **下一帧仍指向同一个
+    //   满槽** → 全部被拒，永久卡死。同时 u_wr_frame（接受计数）继续 +1，
+    //   两者发散 ⇒ 上位机按「写槽 = u_wr_frame mod 256」算出的槽号全错 ⇒
+    //   连"该读哪个槽来解锁"都无法推断 ⇒ 不可恢复。
+    //
+    // 修法：槽号分配用**独立游标** wr_slot_ptr —— 每处理一帧（无论提交成功
+    //   还是被拒）都 +1，因此 wr_slot_ptr ≡ user 域接受计数 u_wr_frame，
+    //   槽号映射恢复正确；被拒帧仍按契约整帧丢弃、不覆盖未读槽（原槽字节
+    //   仍可被读出），但游标不会停 ⇒ 死锁消除。
+    //   stat_wm / stat_wr_frame 语义**不变**（仍是"已提交帧数"），W2 判据不受影响。
+    //=========================================================================
+    reg  [15:0] wr_slot_ptr;
+    wire [7:0]  w_slot_next = wr_slot_ptr[7:0];
     wire        w_no_room   = full_bit_q[w_slot_next];  // W5: 1-cycle-late mirror (retire->rewrite bubble)
     wire        w_bad_len   = (wd_data == 16'd0) || (wd_data > MAX_LEN);
     wire        w_consume   = (wst == W_FILL) && !wf_empty && !w_beat_full;
@@ -284,6 +305,7 @@ module axi4_master_bridge #(
             w_bidx <= 0; w_data_r <= 0; w_strb_r <= 0; w_beat_full <= 0; w_slotfull <= 0;
             wr_commit <= 0; wr_commit_slot <= 0; wr_commit_len <= 0;
             stat_wm <= 0; stat_wr_frame <= 0; stat_wr_stall <= 0; stat_bresp_err <= 0;
+            wr_slot_ptr <= 16'd0;
             stat_len_err <= 0; out_inc <= 1'b0; w_drain_wait <= 4'd0;
             dbg_wr_slot <= 0; dbg_wr_cycles <= 0; dbg_wr_beats <= 0;
         end else begin
@@ -379,6 +401,7 @@ module axi4_master_bridge #(
                         out_inc         <= 1'b1;
                         stat_wm         <= stat_wm + 16'd1;
                         stat_wr_frame   <= stat_wr_frame + 16'd1;
+                        wr_slot_ptr     <= wr_slot_ptr + 16'd1;   // ★W5 FIX: 槽游标随帧推进
                     end else begin
                         stat_bresp_err <= stat_bresp_err + 16'd1;
                     end
@@ -389,6 +412,9 @@ module axi4_master_bridge #(
             W_DRAIN: begin   // refused frame: pull its bytes back out of the FIFO
                 if (w_pop >= w_len) begin
                     if (w_slotfull) stat_wr_stall <= stat_wr_stall + 16'd1;
+                    // ★W5 FIX: 被拒帧同样占用一个槽号（整帧丢弃、不覆盖未读槽），
+                    //   否则游标会停在满槽上造成永久卡死（见 wr_slot_ptr 注释）。
+                    wr_slot_ptr  <= wr_slot_ptr + 16'd1;
                     w_drain_wait <= 4'd0;
                     wst          <= W_IDLE;
                 end else if (w_drain_pop) begin
@@ -452,15 +478,17 @@ module axi4_master_bridge #(
     // is computed here off the PREFETCHED command and registered (pre_eff/pre_in_rng),
     // so the R_PRE beat sees REGISTER-INDEXED lookups only (like the W4-era cone,
     // which closed at +0.008 even WITH an adder; ours has none).
-    wire [7:0]  c_clamp    = (stat_wm == 16'd0) ? 8'd0 : (stat_wm[7:0] - 8'd1);
-    wire        c_in_rng   = (stat_wm >= 16'd256) || (cmd_slot < stat_wm[7:0]);
+    // 槽域判断一律用「槽游标」wr_slot_ptr（已分配的槽号范围），与上位机
+    // 「写槽 = 接受帧计数 mod 256」的口径一致；stat_wm 只表示"已提交"。
+    wire [7:0]  c_clamp    = (wr_slot_ptr == 16'd0) ? 8'd0 : (wr_slot_ptr[7:0] - 8'd1);
+    wire        c_in_rng   = (wr_slot_ptr >= 16'd256) || (cmd_slot < wr_slot_ptr[7:0]);
     wire [7:0]  c_eff      = cmd_rnd ? (c_in_rng ? cmd_slot : c_clamp) : rd_seq_slot;
     reg  [7:0]  pre_eff;      // registered effective slot (latched in R_IDLE)
     reg         pre_in_rng;   // registered range decision (latched in R_IDLE)
     // R_PRE side: all lookups are indexed by the REGISTER pre_eff
     wire [7:0]  p_eff      = pre_eff;
     wire        p_in_rng   = pre_in_rng;
-    wire        p_target_ok  = (stat_wm != 16'd0) && full_bit[pre_eff];
+    wire        p_target_ok  = (wr_slot_ptr != 16'd0) && full_bit[pre_eff];
     // SEQ = "oldest unread slot". The pointer is scanned forward until it lands on
     // a FULL slot, so SEQ stays correct even if RND reads have already retired
     // arbitrary slots (mixed-mode safety, see the W2 note 6.3).

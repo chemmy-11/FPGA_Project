@@ -1,0 +1,2 @@
+Sample in Buffer,Sample in Window,TRIGGER,dbg_calib,dbg_mem_wm[15:0],dbg_mem_wr_frm[15:0],dbg_mem_rd_frm[15:0],dbg_mem_stall[15:0],dbg_mem_len_err[15:0],dbg_mem_bresp[15:0],dbg_mem_ost[8:0],dbg_mem_wslot[7:0],dbg_mem_rslot[7:0],dbg_mem2_wm[15:0],dbg_mem2_wr_frm[15:0],dbg_mem2_rd_frm[15:0],dbg_mem2_ost[8:0]
+Radix - UNSIGNED,UNSIGNED,UNSIGNED,HEX,HEX,HEX,HEX,HEX,HEX,HEX,HEX,HEX,HEX,HEX,HEX,HEX,HEX

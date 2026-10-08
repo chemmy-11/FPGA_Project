@@ -1,4 +1,4 @@
-=== prj10 W4 joint sim 周四 2026/10/08 18:53:54.47 === 
+=== prj10 W4 joint sim 周四 2026/10/08 21:37:17.77 === 
 INFO: [VRFC 10-2263] Analyzing SystemVerilog file "D:/FPGA/prj/project_10/rtl/async_fifo.v" into library work
 INFO: [VRFC 10-311] analyzing module async_fifo
 INFO: [VRFC 10-2263] Analyzing SystemVerilog file "D:/FPGA/prj/project_10/rtl/axi4_master_bridge.v" into library work
@@ -56,7 +56,7 @@ run -all
 === prj10 W4 JOINT SIM: FAIL (deadlock) ===
 $finish called at time : 667775195 ps : File "D:/FPGA/prj/project_10/sim/w4_joint_tb.sv" Line 625
 exit
-INFO: [Common 17-206] Exiting xsim at Thu Oct  8 18:54:05 2026...
+INFO: [Common 17-206] Exiting xsim at Thu Oct  8 21:37:26 2026...
 Vivado Simulator v2023.1
 Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.
 Copyright 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.
@@ -107,4 +107,4 @@ STAT B: wm=148 wr=148 rd=148 stall=0 ill=0 drop=0 bresp=0 len_err=0
 === prj10 W4 JOINT SIM: PASS (0 errors) ===
 $finish called at time : 2349701513 ps : File "D:/FPGA/prj/project_10/sim/w4_joint_tb.sv" Line 604
 exit
-INFO: [Common 17-206] Exiting xsim at Thu Oct  8 18:54:15 2026...
+INFO: [Common 17-206] Exiting xsim at Thu Oct  8 21:37:35 2026...
