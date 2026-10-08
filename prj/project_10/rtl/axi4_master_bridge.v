@@ -37,15 +37,20 @@
 //     constant cfg_mode=1'b0 folded it away AND rd_seq_slot (a register) was the
 //     surviving index -- at +0.008 ns, i.e. the underlying "reg-index -> len_tab
 //     -> +63 adder -> r_beats" chain had ZERO margin even then.
-//   * Fix, three cuts, semantics preserved (decision simply two beats later):
-//     1) R_IDLE prefetch: pop the command FIFO into pre_rnd/pre_slot registers;
-//     2) R_PRE (beat 1) registers the range/eff-slot math (compare+select only),
-//        R_PRE2 (beat 2) does the 256:1 table lookups from REGISTERED indices;
+//   * FINAL fix (2026-10-08, measured WNS -1.121 -> +0.001), three cuts:
+//     1) R_IDLE prefetch: pop the command FIFO AND do the range math there
+//        (c_eff/c_in_rng off cmd_slot + stat_wm), latching pre_eff/pre_in_rng;
+//     2) R_PRE: the 256:1 table lookups (full_bit/len_tab/len_beats_tab) are
+//        indexed by the REGISTER pre_eff only -- never the FIFO output;
 //     3) len_beats_tab[]: beat budget precomputed at write-commit time, so the
-//        read path does two PARALLEL lookups (len 16b, beats 6b) instead of
-//        len-lookup -> +63 adder -> shift.
-//     After cut-1 the cone moved (WNS -1.121 -> -0.494) but "stat_wm -> cmp ->
-//     mux -> 256:1 tree" still chained in one beat; cut-2 splits that too.
+//        read path does two PARALLEL lookups instead of len -> +63 adder.
+//     PLUS: full_bit_q -- a keep-protected registered mirror of full_bit for
+//     the CONTROL lookups (w_no_room / seq_ok / SEQ pointer scan), removing the
+//     256:1 tree from both FSM CE cones. p_target_ok keeps the combinational
+//     read (a slot committed this cycle must be seen FULL by the decision).
+//     NOTE: without (* keep *), synthesis MERGES the mirror back into the tree
+//     and the gain vanishes (measured: -0.121 both with and without).
+//     W2/joint/arb/cmd regressions all green, counters byte-identical.
 //   * rc_rd_en still gates on seq_ok (unchanged: its full_bit[rd_seq_slot]
 //     index is a register, never on the bad path).
 //=============================================================================
@@ -165,21 +170,36 @@ module axi4_master_bridge #(
     reg        rd_retire;
     reg [7:0]  rd_retire_slot;
 
+    // ---- W5 final fix (2026-10-08): registered mirror of full_bit ----
+    // The 256:1 read of full_bit is the last structural cost on the critical
+    // paths (worst: full_bit[76] -> wst FSM, full_bit[5] -> rstate FSM). A
+    // registered mirror removes the tree from the CE paths of both FSMs and
+    // the SEQ pointer scan. FUNCTIONAL note: p_target_ok keeps the
+    // COMBINATIONAL read (correctness: a slot committed this cycle must be
+    // seen as FULL by the decision beat); only the "may I advance / may I
+    // write" lookups use the 1-cycle-late mirror, where the effect is a
+    // harmless 1-cycle bubble on retire->rewrite.
+    (* keep = "true" *) reg full_bit_q [0:255];   // keep: 阻止综合器把镜像合并回组合树(实测会被合并, 时序收益归零)
+
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             for (ti = 0; ti < 256; ti = ti + 1) begin
                 full_bit[ti] <= 1'b0;
+                full_bit_q[ti] <= 1'b0;
                 len_tab[ti]  <= 16'd0;
                 len_beats_tab[ti] <= 8'd0;
             end
         end else begin
             if (wr_commit) begin
                 full_bit[wr_commit_slot] <= 1'b1;
+                full_bit_q[wr_commit_slot] <= 1'b1;
                 len_tab [wr_commit_slot] <= wr_commit_len;
                 len_beats_tab[wr_commit_slot] <= (wr_commit_len + 16'd63) >> 6;
             end
-            if (rd_retire)
+            if (rd_retire) begin
                 full_bit[rd_retire_slot] <= 1'b0;   // retire wins on collision
+                full_bit_q[rd_retire_slot] <= 1'b0;
+            end
         end
     end
 
@@ -225,7 +245,7 @@ module axi4_master_bridge #(
     reg [3:0]   w_drain_wait;           // W2-review D2: W_DRAIN liveness bound
 
     wire [7:0]  w_slot_next = stat_wm[7:0];
-    wire        w_no_room   = full_bit[w_slot_next];
+    wire        w_no_room   = full_bit_q[w_slot_next];  // W5: 1-cycle-late mirror (retire->rewrite bubble)
     wire        w_bad_len   = (wd_data == 16'd0) || (wd_data > MAX_LEN);
     wire        w_consume   = (wst == W_FILL) && !wf_empty && !w_beat_full;
     wire        w_drain_pop = (wst == W_DRAIN) && !wf_empty && (w_pop < w_len);
@@ -416,7 +436,6 @@ module axi4_master_bridge #(
     // registered value (prefetched), never straight off the FWFT RAM output.
     reg         pre_rnd;
     reg [7:0]   pre_slot;
-    reg         pre_seq;             // 1 = this prefetched cmd is SEQ
     // NOTE (2026-10-08): a second cut (state R_PRE2 registering the range
     // decision before the table lookup) was implemented and measured, but
     // Vivado 2023.1 synthesis CRASHED on it (EXCEPTION_ACCESS_VIOLATION, 3x
@@ -427,16 +446,25 @@ module axi4_master_bridge #(
 
     wire        cmd_rnd    = rc_data[8];
     wire [7:0]  cmd_slot   = rc_data[7:0];
-    // beat 1 (R_PRE): range math only -- compare + select, no table lookup
-    wire [7:0]  p_clamp    = (stat_wm == 16'd0) ? 8'd0 : (stat_wm[7:0] - 8'd1);
-    wire        p_in_rng   = (stat_wm >= 16'd256) || (pre_slot < stat_wm[7:0]);
-    wire [7:0]  p_eff      = pre_seq ? rd_seq_slot : (p_in_rng ? pre_slot : p_clamp);
-    // target check: index p_eff is built from REGISTERS (pre_slot/rd_seq_slot/stat_wm)
-    wire        p_target_ok  = (stat_wm != 16'd0) && full_bit[p_eff];
+    // ---- W5 final fix (2026-10-08): range math moved INTO the prefetch beat ----
+    // Measured chain (run C): stat_wm -> compare(CARRY8) -> p_eff mux -> 256:1 tree
+    // -> r_len/r_beats  == 3.6ns vs 3.333ns (-0.494). The range math + slot select
+    // is computed here off the PREFETCHED command and registered (pre_eff/pre_in_rng),
+    // so the R_PRE beat sees REGISTER-INDEXED lookups only (like the W4-era cone,
+    // which closed at +0.008 even WITH an adder; ours has none).
+    wire [7:0]  c_clamp    = (stat_wm == 16'd0) ? 8'd0 : (stat_wm[7:0] - 8'd1);
+    wire        c_in_rng   = (stat_wm >= 16'd256) || (cmd_slot < stat_wm[7:0]);
+    wire [7:0]  c_eff      = cmd_rnd ? (c_in_rng ? cmd_slot : c_clamp) : rd_seq_slot;
+    reg  [7:0]  pre_eff;      // registered effective slot (latched in R_IDLE)
+    reg         pre_in_rng;   // registered range decision (latched in R_IDLE)
+    // R_PRE side: all lookups are indexed by the REGISTER pre_eff
+    wire [7:0]  p_eff      = pre_eff;
+    wire        p_in_rng   = pre_in_rng;
+    wire        p_target_ok  = (stat_wm != 16'd0) && full_bit[pre_eff];
     // SEQ = "oldest unread slot". The pointer is scanned forward until it lands on
     // a FULL slot, so SEQ stays correct even if RND reads have already retired
     // arbitrary slots (mixed-mode safety, see the W2 note 6.3).
-    wire        seq_ok   = cmd_rnd | full_bit[rd_seq_slot] | (stat_outstanding == 9'd0);
+    wire        seq_ok   = cmd_rnd | full_bit_q[rd_seq_slot] | (stat_outstanding == 9'd0); // W5: mirror
 
     assign rc_rd_en = (rstate == R_IDLE) && calib_ok && !rc_empty && seq_ok;
 
@@ -459,7 +487,8 @@ module axi4_master_bridge #(
             rf_wr_en <= 0; rf_wr_data <= 0; rd_wr_en <= 0; rd_wr_data <= 0;
             r_slot <= 0; r_beat <= 0; r_bi <= 0; r_beats <= 0; r_len <= 0;
             r_beat_data <= 0; r_rnd <= 0;
-            pre_rnd <= 1'b0; pre_slot <= 8'd0; pre_seq <= 1'b0;
+            pre_rnd <= 1'b0; pre_slot <= 8'd0;
+            pre_eff <= 8'd0; pre_in_rng <= 1'b0;
             rd_retire <= 0; rd_retire_slot <= 0; rd_seq_slot <= 0;
             stat_rd_frame <= 0; stat_ill_rd <= 0; stat_noframe <= 0; dbg_rd_slot <= 0;
             dbg_rd_cycles <= 0; dbg_rd_beats <= 0; out_dec <= 1'b0;
@@ -478,14 +507,18 @@ module axi4_master_bridge #(
                 // SEQ pointer scan (1 slot / ui cycle, no command is consumed).
                 // Guard uses only registered values (rd_seq_slot is a reg) --
                 // deliberately NOT cmd_rnd: that would revive the FIFO-output cone.
-                if (!full_bit[rd_seq_slot] && (stat_outstanding != 9'd0))
+                if (!full_bit_q[rd_seq_slot] && (stat_outstanding != 9'd0))
                     rd_seq_slot <= rd_seq_slot + 8'd1;
                 if (rc_rd_en) begin
-                    // prefetch: capture the command; decide next cycle in R_PRE
-                    pre_rnd  <= cmd_rnd;
-                    pre_slot <= cmd_slot;
-                    pre_seq  <= !cmd_rnd;
-                    rstate   <= R_PRE;
+                    // prefetch beat: capture the command AND do the range math
+                    // (compare + select) here, so the next beat is register-indexed
+                    // lookups only. Inputs: cmd_slot/cmd_rnd (FIFO comb read, short
+                    // hop to these regs) + stat_wm/rd_seq_slot (registers).
+                    pre_rnd    <= cmd_rnd;
+                    pre_slot   <= cmd_slot;
+                    pre_eff    <= c_eff;
+                    pre_in_rng <= c_in_rng;
+                    rstate     <= R_PRE;
                 end
             end
             //-----------------------------------------------------------------

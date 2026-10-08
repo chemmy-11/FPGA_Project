@@ -1,4 +1,4 @@
-=== prj10 W2 sim 周四 2026/10/08  0:17:46.83 === 
+=== prj10 W2 sim 周四 2026/10/08 18:53:40.44 === 
 INFO: [VRFC 10-2263] Analyzing SystemVerilog file "D:/FPGA/prj/project_10/rtl/async_fifo.v" into library work
 INFO: [VRFC 10-311] analyzing module async_fifo
 INFO: [VRFC 10-2263] Analyzing SystemVerilog file "D:/FPGA/prj/project_10/rtl/axi4_master_bridge.v" into library work
@@ -58,6 +58,6 @@ STAT service: wr=933 ui-cycles/frame (3.11 us @300MHz)  rd=921 (3.07 us)  frame 
 STAT wstrb: full=7655 partial_tail=547 illegal=0
 === prj10 W2 SIM: PASS (0 errors) ===
 $finish called at time : 8814630 ns : File "D:/FPGA/prj/project_10/sim/mem_bridge_tb.sv" Line 487
-run: Time (s): cpu = 00:00:00 ; elapsed = 00:00:06 . Memory (MB): peak = 197.672 ; gain = 0.000
+run: Time (s): cpu = 00:00:00 ; elapsed = 00:00:06 . Memory (MB): peak = 198.031 ; gain = 0.000
 exit
-INFO: [Common 17-206] Exiting xsim at Thu Oct  8 00:18:00 2026...
+INFO: [Common 17-206] Exiting xsim at Thu Oct  8 18:53:54 2026...

@@ -1,6 +1,6 @@
 List of CLB Tiles
-CLE_M_X56Y67
-CLEL_R_X56Y67
+CLE_M_X56Y66
+CLEL_R_X56Y66
 
 List of Congested Nets
 

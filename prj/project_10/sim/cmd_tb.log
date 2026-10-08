@@ -1,4 +1,4 @@
-=== prj10 W5 cmd_channel unit sim 周三 2026/10/07 23:47:40.94 === 
+=== prj10 W5 cmd_channel unit sim 周四 2026/10/08 18:04:12.08 === 
 INFO: [VRFC 10-2263] Analyzing SystemVerilog file "D:/FPGA/prj/project_10/prj_loop/rtl_patch/cmd_channel.v" into library work
 INFO: [VRFC 10-311] analyzing module cmd_channel
 INFO: [VRFC 10-2263] Analyzing SystemVerilog file "D:/FPGA/prj/project_10/sim/cmd_channel_tb.sv" into library work
@@ -184,7 +184,7 @@ STAT frames=49 rx=51 err=2 exec=49 rd_trig=18 pulses=18 pw=1 busy_rises=49
 === prj10 W5 CMD SIM: FAIL (68 errors) ===
 $finish called at time : 398196 ns : File "D:/FPGA/prj/project_10/sim/cmd_channel_tb.sv" Line 668
 exit
-INFO: [Common 17-206] Exiting xsim at Wed Oct  7 23:47:47 2026...
+INFO: [Common 17-206] Exiting xsim at Thu Oct  8 18:04:19 2026...
 Vivado Simulator v2023.1
 Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.
 Copyright 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.
@@ -228,5 +228,5 @@ STAT frames=46 rx=47 err=5 exec=46 rd_trig=14 pulses=14 pw=1 busy_rises=46
 === prj10 W5 CMD SIM: PASS (0 errors) ===
 $finish called at time : 399276 ns : File "D:/FPGA/prj/project_10/sim/cmd_channel_tb.sv" Line 668
 exit
-INFO: [Common 17-206] Exiting xsim at Wed Oct  7 23:47:54 2026...
+INFO: [Common 17-206] Exiting xsim at Thu Oct  8 18:04:25 2026...
 === prj10 W5 CMD SIM: PASS (0 errors) ===
