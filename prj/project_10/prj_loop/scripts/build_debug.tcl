@@ -43,7 +43,7 @@ create_debug_core u_ila_0 ila
 set_property C_DATA_DEPTH 2048 [get_debug_cores u_ila_0]
 set_property C_TRIGIN_EN false [get_debug_cores u_ila_0]
 set_property C_TRIGOUT_EN false [get_debug_cores u_ila_0]
-set_property C_INPUT_PIPE_STAGES 0 [get_debug_cores u_ila_0]
+set_property C_INPUT_PIPE_STAGES 1 [get_debug_cores u_ila_0]   ;# ★W6: 探针输入加 1 级流水, 解 ILA 引起的布线拥塞(WNS -0.235 -> 目标 >=0)
 set_property C_EN_STRG_QUAL false [get_debug_cores u_ila_0]
 set_property ALL_PROBE_SAME_MU true [get_debug_cores u_ila_0]
 set_property ALL_PROBE_SAME_MU_CNT 1 [get_debug_cores u_ila_0]
@@ -57,8 +57,11 @@ puts "ILA0_CLK_NET: $uclk_net"
 connect_debug_port u_ila_0/clk $uclk_net
 
 set nets0 {}
-foreach n [bus_nets dbg_rx_tdata    64] { lappend nets0 $n }
-foreach n [bus_nets dbg_rx_tkeep     8] { lappend nets0 $n }
+# ★W6(2026-10-09): 裁掉 Aurora RX 原始字节流(74 bit)腾布线余量给 W5 命令通道探针。
+#   理由: 该字节流是 prj9 链路调试期遗留, 链路已由 ch_up/lane_up/err 计数证实可用;
+#   实测代价: 完整探针版 WNS -0.078, 需腾 ~0.08ns。
+# foreach n [bus_nets dbg_rx_tdata    64] { lappend nets0 $n }
+# foreach n [bus_nets dbg_rx_tkeep     8] { lappend nets0 $n }
 lappend nets0 [one_net dbg_rx_tvalid]
 lappend nets0 [one_net dbg_rx_tlast ]
 foreach n [bus_nets dbg_up_frames   16] { lappend nets0 $n }
@@ -102,7 +105,7 @@ create_debug_core u_ila_1 ila
 set_property C_DATA_DEPTH 2048 [get_debug_cores u_ila_1]
 set_property C_TRIGIN_EN false [get_debug_cores u_ila_1]
 set_property C_TRIGOUT_EN false [get_debug_cores u_ila_1]
-set_property C_INPUT_PIPE_STAGES 0 [get_debug_cores u_ila_1]
+set_property C_INPUT_PIPE_STAGES 1 [get_debug_cores u_ila_1]
 set_property C_EN_STRG_QUAL false [get_debug_cores u_ila_1]
 set_property ALL_PROBE_SAME_MU true [get_debug_cores u_ila_1]
 set_property ALL_PROBE_SAME_MU_CNT 1 [get_debug_cores u_ila_1]
@@ -139,7 +142,7 @@ create_debug_core u_ila_2 ila
 set_property C_DATA_DEPTH 1024 [get_debug_cores u_ila_2]
 set_property C_TRIGIN_EN false [get_debug_cores u_ila_2]
 set_property C_TRIGOUT_EN false [get_debug_cores u_ila_2]
-set_property C_INPUT_PIPE_STAGES 0 [get_debug_cores u_ila_2]
+set_property C_INPUT_PIPE_STAGES 1 [get_debug_cores u_ila_2]
 set_property C_EN_STRG_QUAL false [get_debug_cores u_ila_2]
 set_property ALL_PROBE_SAME_MU true [get_debug_cores u_ila_2]
 set_property ALL_PROBE_SAME_MU_CNT 1 [get_debug_cores u_ila_2]
@@ -173,7 +176,7 @@ create_debug_core u_ila_3 ila
 set_property C_DATA_DEPTH 2048 [get_debug_cores u_ila_3]
 set_property C_TRIGIN_EN false [get_debug_cores u_ila_3]
 set_property C_TRIGOUT_EN false [get_debug_cores u_ila_3]
-set_property C_INPUT_PIPE_STAGES 0 [get_debug_cores u_ila_3]
+set_property C_INPUT_PIPE_STAGES 1 [get_debug_cores u_ila_3]
 set_property C_EN_STRG_QUAL false [get_debug_cores u_ila_3]
 set_property ALL_PROBE_SAME_MU true [get_debug_cores u_ila_3]
 set_property ALL_PROBE_SAME_MU_CNT 1 [get_debug_cores u_ila_3]

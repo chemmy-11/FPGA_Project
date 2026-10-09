@@ -245,6 +245,23 @@ module axi4_master_bridge #(
     reg [3:0]   w_drain_wait;           // W2-review D2: W_DRAIN liveness bound
 
     //=========================================================================
+    // ★L2 FIX (2026-10-09, 上板实测 20.3us/帧固定开销) —— 写路径流水化
+    //
+    // 实测: 写槽路径每帧耗时 T = 20.3us + 11.9ns/字节, 其中 20.3us 是
+    //   **每帧固定开销**; 且 RND 模式下把读路径与二级桥全部停掉, 速率
+    //   一点没变(26.4k vs 26.5k fps) => 纯**延迟**受限, 不是带宽(MIG 占用仅 3-5%)。
+    // 根因: 原 W_FSM 每帧必须走 W_B 等 DDR 写响应(BVALID)才回到 W_IDLE,
+    //   于是每帧白白串行一个 Lw。AXI 允许同 ID 多笔 outstanding 且响应保序,
+    //   所以把「出队提交」与「取下一帧」解耦即可把 Lw 藏在流水线里。
+    // 做法: 最后一拍压 {槽号,长度} 入 4 深提交队列后立即回 W_IDLE;
+    //   B 响应由本 always 块顶部的独立逻辑按序出队提交(FIFO 保序 = 同 ID 保序)。
+    //=========================================================================
+    reg [7:0]   cqs0, cqs1, cqs2, cqs3;   // 提交队列: 槽号(按序)
+    reg [15:0]  cql0, cql1, cql2, cql3;   // 提交队列: 帧长(按序)
+    reg [2:0]   cq_cnt;                   // 在途笔数 (0..4)
+    wire        w_last_beat = (w_beat == (w_beats - 8'd1));
+
+    //=========================================================================
     // ★W5 FIX (2026-10-08, 上板实测死锁) —— 写槽游标与提交计数解耦
     //
     // 缺陷现场（ILA 实测）：dbg_mem_u_wr=334（user 域"接受"帧数）而
@@ -308,9 +325,29 @@ module axi4_master_bridge #(
             wr_slot_ptr <= 16'd0;
             stat_len_err <= 0; out_inc <= 1'b0; w_drain_wait <= 4'd0;
             dbg_wr_slot <= 0; dbg_wr_cycles <= 0; dbg_wr_beats <= 0;
+            cqs0 <= 0; cqs1 <= 0; cqs2 <= 0; cqs3 <= 0;
+            cql0 <= 0; cql1 <= 0; cql2 <= 0; cql3 <= 0; cq_cnt <= 3'd0;
         end else begin
             wr_commit <= 1'b0;
             out_inc   <= 1'b0;     // D1 FIX: this block is the ONLY driver of out_inc
+
+            // ---- ★L2: B 响应出队提交(与写 FSM 解耦, 同 ID 保序 = FIFO 保序) ----
+            m_axi_bready <= (cq_cnt != 3'd0);
+            if (m_axi_bvalid && m_axi_bready) begin
+                if (m_axi_bresp == 2'b00) begin
+                    wr_commit      <= 1'b1;
+                    wr_commit_slot <= cqs0;
+                    wr_commit_len  <= cql0;
+                    out_inc        <= 1'b1;
+                    stat_wm        <= stat_wm + 16'd1;
+                    stat_wr_frame  <= stat_wr_frame + 16'd1;
+                end else begin
+                    stat_bresp_err <= stat_bresp_err + 16'd1;
+                end
+                cqs0   <= cqs1; cqs1 <= cqs2; cqs2 <= cqs3;
+                cql0   <= cql1; cql1 <= cql2; cql2 <= cql3;
+                cq_cnt <= cq_cnt - 3'd1;
+            end
 
             // byte assembly (only inside W_FILL); see W_PUSH for the handover
             if (w_consume) begin
@@ -329,7 +366,7 @@ module axi4_master_bridge #(
             W_IDLE: begin
                 m_axi_awvalid <= 1'b0;
                 m_axi_wvalid  <= 1'b0;
-                m_axi_bready  <= 1'b0;
+                // ★L2: bready 改由顶部 B 出队逻辑统一驱动(此处不再清零)
                 if (wd_rd_en) begin                       // descriptor pops this cycle
                     w_len     <= wd_data;
                     w_pop     <= 16'd0;
@@ -338,6 +375,9 @@ module axi4_master_bridge #(
                     dbg_wr_slot <= w_slot_next;
                     w_beat <= 8'd0; w_bi <= 8'd0; w_bidx <= 12'd0;
                     w_beat_full <= 1'b0; w_data_r <= 0; w_strb_r <= 0;
+                    // ★L2: 槽游标在**接收时**推进(流水化后提交是滞后的, 不能再由提交驱动,
+                    //   否则连续多帧会抢同一个槽号)。被拒帧同样消耗槽号(沿用 W5 死锁修法)。
+                    wr_slot_ptr <= wr_slot_ptr + 16'd1;
                     if (w_no_room | w_bad_len) begin
                         wst          <= W_DRAIN;          // refuse: never overwrite
                         w_drain_wait <= 4'd0;
@@ -366,6 +406,11 @@ module axi4_master_bridge #(
             end
             //-----------------------------------------------------------------
             W_PUSH: begin
+                // ★L2: 最后一拍发出前先确认提交队列有空位, 否则握停
+                //   (拍一旦发出就必须有地方记录, 否则会重复发同一拍)
+                if (w_last_beat && (cq_cnt == 3'd4)) begin
+                    m_axi_wvalid <= 1'b0;
+                end else begin
                 m_axi_wvalid <= 1'b1;
                 if (m_axi_wvalid && m_axi_wready) begin
                     m_axi_wvalid <= 1'b0;
@@ -381,40 +426,33 @@ module axi4_master_bridge #(
                     // (len mod 64) lanes wide; wstrb=0 lanes are not written by AXI.
                     w_strb_r     <= 64'd0;
                     dbg_wr_beats <= dbg_wr_beats + 32'd1;
-                    if (w_beat == (w_beats - 8'd1)) begin
-                        wst <= W_B;
+                    if (w_last_beat) begin
+                        // ★L2: 入提交队列后立即回 W_IDLE —— 不再等 BVALID
+                        cqs3 <= cqs2; cqs2 <= cqs1; cqs1 <= cqs0; cqs0 <= w_slot;
+                        cql3 <= cql2; cql2 <= cql1; cql1 <= cql0; cql0 <= w_len;
+                        cq_cnt <= cq_cnt + 3'd1;
+                        wst <= W_IDLE;
                     end else begin
                         w_beat <= w_beat + 8'd1;
                         wst    <= W_FILL;
                     end
                 end
+                end
             end
             //-----------------------------------------------------------------
+            // ★L2: W_B 已停用(保留状态编码避免改动面扩大); B 响应由块顶部出队逻辑处理。
             W_B: begin
-                m_axi_bready <= 1'b1;
-                if (m_axi_bvalid && m_axi_bready) begin
-                    m_axi_bready <= 1'b0;
-                    if (m_axi_bresp == 2'b00) begin
-                        wr_commit       <= 1'b1;
-                        wr_commit_slot  <= w_slot;
-                        wr_commit_len   <= w_len;
-                        out_inc         <= 1'b1;
-                        stat_wm         <= stat_wm + 16'd1;
-                        stat_wr_frame   <= stat_wr_frame + 16'd1;
-                        wr_slot_ptr     <= wr_slot_ptr + 16'd1;   // ★W5 FIX: 槽游标随帧推进
-                    end else begin
-                        stat_bresp_err <= stat_bresp_err + 16'd1;
-                    end
-                    wst <= W_IDLE;
-                end
+                // ★L2: 本状态已停用(不会再进入)。提交/出队全部由块顶部逻辑完成;
+                //   槽游标改在 W_IDLE 接收时推进。保留编码仅为缩小改动面。
+                wst <= W_IDLE;
             end
             //-----------------------------------------------------------------
             W_DRAIN: begin   // refused frame: pull its bytes back out of the FIFO
                 if (w_pop >= w_len) begin
                     if (w_slotfull) stat_wr_stall <= stat_wr_stall + 16'd1;
-                    // ★W5 FIX: 被拒帧同样占用一个槽号（整帧丢弃、不覆盖未读槽），
-                    //   否则游标会停在满槽上造成永久卡死（见 wr_slot_ptr 注释）。
-                    wr_slot_ptr  <= wr_slot_ptr + 16'd1;
+                    // ★W5/L2: 被拒帧同样占用一个槽号(整帧丢弃、不覆盖未读槽), 否则
+                    //   游标会停在满槽上造成永久卡死; 但自 L2 起推进点已统一到
+                    //   W_IDLE 接收时, 此处**不得**再推(否则被拒帧推两次)。
                     w_drain_wait <= 4'd0;
                     wst          <= W_IDLE;
                 end else if (w_drain_pop) begin

@@ -30,7 +30,7 @@ create_debug_core u_ila_0 ila
 set_property C_DATA_DEPTH 2048 [get_debug_cores u_ila_0]
 set_property C_TRIGIN_EN false [get_debug_cores u_ila_0]
 set_property C_TRIGOUT_EN false [get_debug_cores u_ila_0]
-set_property C_INPUT_PIPE_STAGES 0 [get_debug_cores u_ila_0]
+set_property C_INPUT_PIPE_STAGES 1 [get_debug_cores u_ila_0]   ;# ★W6: 与 build_debug.tcl 保持一致
 set_property C_EN_STRG_QUAL false [get_debug_cores u_ila_0]
 set_property ALL_PROBE_SAME_MU true [get_debug_cores u_ila_0]
 set_property ALL_PROBE_SAME_MU_CNT 1 [get_debug_cores u_ila_0]
@@ -44,8 +44,11 @@ puts "ILA0_CLK_NET: $uclk_net"
 connect_debug_port u_ila_0/clk $uclk_net
 
 set nets0 {}
-foreach n [bus_nets dbg_rx_tdata    64] { lappend nets0 $n }
-foreach n [bus_nets dbg_rx_tkeep     8] { lappend nets0 $n }
+# ★W6(2026-10-09): 裁掉 Aurora RX 原始字节流(74 bit)腾布线余量给 W5 命令通道探针。
+#   理由: 该字节流是 prj9 链路调试期遗留, 链路已由 ch_up/lane_up/err 计数证实可用;
+#   实测代价: 完整探针版 WNS -0.078, 需腾 ~0.08ns。
+# foreach n [bus_nets dbg_rx_tdata    64] { lappend nets0 $n }
+# foreach n [bus_nets dbg_rx_tkeep     8] { lappend nets0 $n }
 lappend nets0 [one_net dbg_rx_tvalid]
 lappend nets0 [one_net dbg_rx_tlast ]
 foreach n [bus_nets dbg_up_frames   16] { lappend nets0 $n }
@@ -75,6 +78,12 @@ foreach n [bus_nets dbg_mem_ost_s   9] { lappend nets0 $n }
 # ---- W4: 桥② user 域观测 ----
 foreach n [bus_nets dbg_mem2_u_wr  16] { lappend nets0 $n }
 foreach n [bus_nets dbg_mem2_u_rd  16] { lappend nets0 $n }
+# ---- W5: 命令通道 user 域观测（模式/读槽号/执行数/触发数）----
+# ★2026-10-09 W6 补齐: resume 路径此前缺这 4 项, 导致最终位流丢了命令通道可观测性
+lappend nets0 [one_net dbg_cmd_mode]
+foreach n [bus_nets dbg_cmd_slot   8] { lappend nets0 $n }
+foreach n [bus_nets dbg_cmd_exec  16] { lappend nets0 $n }
+foreach n [bus_nets dbg_cmd_trig  16] { lappend nets0 $n }
 set_property port_width [llength $nets0] [get_debug_ports u_ila_0/probe0]
 connect_debug_port u_ila_0/probe0 $nets0
 
@@ -83,7 +92,7 @@ create_debug_core u_ila_1 ila
 set_property C_DATA_DEPTH 2048 [get_debug_cores u_ila_1]
 set_property C_TRIGIN_EN false [get_debug_cores u_ila_1]
 set_property C_TRIGOUT_EN false [get_debug_cores u_ila_1]
-set_property C_INPUT_PIPE_STAGES 0 [get_debug_cores u_ila_1]
+set_property C_INPUT_PIPE_STAGES 1 [get_debug_cores u_ila_1]
 set_property C_EN_STRG_QUAL false [get_debug_cores u_ila_1]
 set_property ALL_PROBE_SAME_MU true [get_debug_cores u_ila_1]
 set_property ALL_PROBE_SAME_MU_CNT 1 [get_debug_cores u_ila_1]
@@ -108,6 +117,11 @@ lappend nets1 [one_net dbg_udp_rec_done]
 lappend nets1 [one_net dbg_icmp_rec_done]
 foreach n [bus_nets dbg_rec_byte_num 16] { lappend nets1 $n }
 foreach n [bus_nets dbg_udp_src_port 16] { lappend nets1 $n }
+# ---- W5: 命令通道 eth 域观测（收命令数/错帧数/响应占用）----
+# ★2026-10-09 W6 补齐: 同上
+foreach n [bus_nets dbg_cmd_rx   16] { lappend nets1 $n }
+foreach n [bus_nets dbg_cmd_err  16] { lappend nets1 $n }
+lappend nets1 [one_net dbg_cmd_respbsy]
 set_property port_width [llength $nets1] [get_debug_ports u_ila_1/probe0]
 connect_debug_port u_ila_1/probe0 $nets1
 
@@ -116,7 +130,7 @@ create_debug_core u_ila_2 ila
 set_property C_DATA_DEPTH 1024 [get_debug_cores u_ila_2]
 set_property C_TRIGIN_EN false [get_debug_cores u_ila_2]
 set_property C_TRIGOUT_EN false [get_debug_cores u_ila_2]
-set_property C_INPUT_PIPE_STAGES 0 [get_debug_cores u_ila_2]
+set_property C_INPUT_PIPE_STAGES 1 [get_debug_cores u_ila_2]
 set_property C_EN_STRG_QUAL false [get_debug_cores u_ila_2]
 set_property ALL_PROBE_SAME_MU true [get_debug_cores u_ila_2]
 set_property ALL_PROBE_SAME_MU_CNT 1 [get_debug_cores u_ila_2]
@@ -149,7 +163,7 @@ create_debug_core u_ila_3 ila
 set_property C_DATA_DEPTH 2048 [get_debug_cores u_ila_3]
 set_property C_TRIGIN_EN false [get_debug_cores u_ila_3]
 set_property C_TRIGOUT_EN false [get_debug_cores u_ila_3]
-set_property C_INPUT_PIPE_STAGES 0 [get_debug_cores u_ila_3]
+set_property C_INPUT_PIPE_STAGES 1 [get_debug_cores u_ila_3]
 set_property C_EN_STRG_QUAL false [get_debug_cores u_ila_3]
 set_property ALL_PROBE_SAME_MU true [get_debug_cores u_ila_3]
 set_property ALL_PROBE_SAME_MU_CNT 1 [get_debug_cores u_ila_3]

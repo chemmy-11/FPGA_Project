@@ -21,6 +21,12 @@ remove_files -quiet [get_files -quiet $P9/rtl/udp/udp_tx.v]
 add_files -fileset sources_1 $P/rtl_patch/udp_tx.v
 # W5: UDP 命令通道（prj10 自研, 官方模块零改动）
 add_files -fileset sources_1 $P/rtl_patch/cmd_channel.v
+## ---- L1 帧泵修复(2026-10-09): 换派生副本(prj9 原件不动) ----
+##   案: 原泵是握手门控(帧在途时到达的帧整帧丢弃) -> 背靠背丢 50%,
+##       上板字节项 11.6ns/B(= 线速 8.0 + 泵排出 3.33 被串行) 封顶 489 Mbps。
+##   派生版改乒乓双 bank: 帧尾立即翻 bank 接收下一帧。压力 TB: 原版丢 100/200, 派生版 0 丢。
+remove_files -quiet [get_files -quiet $P9/rtl/frame_fifo_pump.v]
+add_files -fileset sources_1 $P/rtl_patch/frame_fifo_pump.v
 add_files -fileset sources_1 [glob $P9/shared_logic/*.v]
 
 ## ---- prj10: 内存桥三层 + 派生顶层(不含 w3_uiclk_top —— 那是前置工程专用顶层) ----

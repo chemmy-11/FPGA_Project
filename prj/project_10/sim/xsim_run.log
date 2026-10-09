@@ -1,4 +1,4 @@
-=== prj10 W2 sim 周四 2026/10/08 21:36:54.33 === 
+=== prj10 W2 sim 周五 2026/10/09 15:49:12.68 === 
 INFO: [VRFC 10-2263] Analyzing SystemVerilog file "D:/FPGA/prj/project_10/rtl/async_fifo.v" into library work
 INFO: [VRFC 10-311] analyzing module async_fifo
 INFO: [VRFC 10-2263] Analyzing SystemVerilog file "D:/FPGA/prj/project_10/rtl/axi4_master_bridge.v" into library work
@@ -54,10 +54,10 @@ T3 (slot watermark: no unread frame overwritten, refusals counted) PASS
 STAT counters: wm=585 wr_frame=585 rd_frame=585 wr_stall=1 ill_rd=3 noframe=0 bresp_err=0
 STAT axi: wr_beats=8202 rd_beats=8202 4k_violation=0 axi_proto_err=0
 STAT margin: user_pushed=586 ui_committed=585 user_drop=8 hold_cycles=24098
-STAT service: wr=933 ui-cycles/frame (3.11 us @300MHz)  rd=921 (3.07 us)  frame period 12.30 us
+STAT service: wr=931 ui-cycles/frame (3.10 us @300MHz)  rd=921 (3.07 us)  frame period 12.30 us
 STAT wstrb: full=7655 partial_tail=547 illegal=0
 === prj10 W2 SIM: PASS (0 errors) ===
 $finish called at time : 8814630 ns : File "D:/FPGA/prj/project_10/sim/mem_bridge_tb.sv" Line 487
-run: Time (s): cpu = 00:00:00 ; elapsed = 00:00:06 . Memory (MB): peak = 198.355 ; gain = 0.000
+run: Time (s): cpu = 00:00:00 ; elapsed = 00:00:07 . Memory (MB): peak = 205.879 ; gain = 0.000
 exit
-INFO: [Common 17-206] Exiting xsim at Thu Oct  8 21:37:07 2026...
+INFO: [Common 17-206] Exiting xsim at Fri Oct  9 15:49:28 2026...
