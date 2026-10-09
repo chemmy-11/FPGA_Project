@@ -264,7 +264,9 @@ def main():
     print()
 
     hr()
-    print("(5) 「传输速率 / 延迟」（量化参考；导师 Q5：本期暂不要求提高端口速率）")
+    print("(5) 「传输速率 / 延迟」—— 注意：这是**功能参考档**，不是吞吐判据")
+    print("    本档每帧之间由上位机 sleep 限速，数值比硬件能力低两个数量级；")
+    print("    与 PRJ9 可比的高速率测试请用 PRJ9 同款工具 json_storm.py（见下）。")
     size = int(summary.get("frame_size", 64))
     wdur = mc.get("write_dur_s")
     if wdur:
@@ -281,6 +283,10 @@ def main():
               % (len(rtts), avg, min(rtts), max(rtts)))
         if avg > 0:
             print("                  串行读吞吐 ≈ %.0f 帧/秒（含等待；受 RTT 限制）" % (1000.0 / avg))
+    print("    高速率口径  : 与 PRJ9 **同款工具、同款档位**（json_storm.py 质量档/吞吐档）——")
+    print("                  W4-J4 实测：质量档 7022 片 100% 收到 + SHA256 一致；")
+    print("                  吞吐档（--pace-us 13）发送 51.76 MB/s（414 Mbps），超链路能力部分")
+    print("                  丢在泵A 入口（ILA 佐证 pfwd_drop），**不是内存桥丢帧**。")
     print("    链路含义    : 单帧要穿 以太网栈→泵A→DDR4 槽区→Aurora 10G 光口→光纤往返→")
     print("                  解包→第二级 DDR4→泵B→RGMII，两级内存各一次读写；")
     print("                  延迟主要来自命令往返与两级存储转发，与端口线速(1Gbps)无关。")
