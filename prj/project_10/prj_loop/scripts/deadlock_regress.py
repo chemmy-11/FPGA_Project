@@ -150,6 +150,13 @@ def main():
         print("  接受 %d + 拒收 %d = %d（期望 %d）  读回 %d/%d"
               % (acc, drp, acc + drp, args.n, got, args.tail))
     print("=" * 74)
+    # ★收尾恢复 SEQ: 本用例全程用 RND(只写不读), 若留着 RND, 后续任何依赖
+    #   自动读/回显的工具(如 prj9 json_storm)都会"收到 0 片"而被误判为故障。
+    try:
+        cmd.send(OP_SET_MODE, 0)
+        print("已恢复 SEQ 模式（避免污染后续依赖回显的测试）")
+    except Exception:
+        pass
     ds.close()
     cmd.close()
     return 0 if ok else 1
