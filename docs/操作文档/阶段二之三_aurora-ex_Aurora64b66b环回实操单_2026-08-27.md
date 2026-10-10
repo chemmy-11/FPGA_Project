@@ -6,7 +6,7 @@ type: 操作文档
 目标: Aurora duplex 单 lane 10G 环回，channel_up + lane_up + 误码计数 0 + ILA 数据流
 created: 2026-08-27
 updated: 2026-08-27
-related: "[[操作文档/阶段二_aurora-ex_SFP收发与Aurora64b66b_2026-08-04]] · [[操作文档/阶段二前置_ibert_IBERT眼图自检实操单_2026-08-23]] · [[笔记和开发指南/光纤接口8b10b]] · [[追踪_cross_短期待办_2026-08-03]]"
+related: "[[操作文档/阶段二_aurora-ex_SFP收发与Aurora64b66b_2026-08-04]] · [[操作文档/阶段二前置_ibert_IBERT眼图自检实操单_2026-08-23]] · [[笔记和开发指南/光纤接口8b10b]] · [[追踪_cross_短期待办_2026-10-10]]"
 ---
 
 # 阶段二之三 · Aurora 64b/66b 环回验证（配置定版卡）

@@ -6,7 +6,7 @@ type: 操作文档
 目标: 用 IBERT 验证 FMC 四光口物理链路（GTH + 参考时钟 + 光模块 + 光纤），产出眼图截图
 created: 2026-08-23
 updated: 2026-08-27
-related: "[[操作文档/阶段二_aurora-ex_SFP收发与Aurora64b66b_2026-08-04]] · [[笔记和开发指南/光纤接口眼图]] · [[追踪_cross_短期待办_2026-08-03]]"
+related: "[[操作文档/阶段二_aurora-ex_SFP收发与Aurora64b66b_2026-08-04]] · [[笔记和开发指南/光纤接口眼图]] · [[追踪_cross_短期待办_2026-10-10]]"
 ---
 
 # 阶段二前置 · IBERT 光口眼图自检（手把手实操单）
@@ -306,7 +306,7 @@ set_property -dict {PACKAGE_PIN A27  IOSTANDARD LVCMOS33} [get_ports SFPD_TX_DIS
 
 **收尾动作（5 分钟）**：
 - [ ] 结果同步给 VSCode Reasonix 更新 `D:\FPGA\AGENTS.md`（待查项①②正式闭环）+ git 提交例程工程与截图；
-- [ ] [[操作文档/阶段二_aurora-ex_SFP收发与Aurora64b66b_2026-08-04]] §2.6 与 [[追踪_cross_短期待办_2026-08-03]] 对应项打勾；
+- [ ] [[操作文档/阶段二_aurora-ex_SFP收发与Aurora64b66b_2026-08-04]] §2.6 与 [[追踪_cross_短期待办_2026-10-10]] 对应项打勾；
 - [ ] 把"实测频率/引脚版本/通道映射"回填 [[笔记和开发指南/光纤接口眼图]] §四参数表（知识沉淀）。
 
 ---

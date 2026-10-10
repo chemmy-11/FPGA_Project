@@ -82,3 +82,6 @@ vivado-mcp/logs/
 # ===== prj10 集成工程（生成的 Vivado 工程目录 + 路由临时文件，可由 scripts/*.tcl 幂等重建）=====
 prj/project_10/prj_loop/vivado/
 prj/project_10/prj_loop/.tmpCRC/
+
+# ===== Vivado 工程目录(prj11起统一, 可再生不提交) =====
+prj/project_11/vivado/
