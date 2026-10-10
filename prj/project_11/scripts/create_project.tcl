@@ -49,6 +49,9 @@ generate_target all [get_ips]
 ## ---- 约束(prj9 全文 + L92 修正 + DDR 107 脚, 与 prj_loop 逐字节一致) ----
 add_files -fileset constrs_1 $P/xdc/aurora_mem_bridge.xdc
 
+## ---- prj11 B1: MicroBlaze 控制面 BD（幂等; 含 axi_lite_regs 模块引用） ----
+source $P/scripts/create_bd_b.tcl
+
 ## ---- 顶层 ----
 set_property top aurora_mem_bridge [current_fileset]
 update_compile_order -fileset sources_1

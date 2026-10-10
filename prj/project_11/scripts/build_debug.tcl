@@ -98,6 +98,12 @@ lappend nets0 [one_net dbg_cmd_mode]
 foreach n [bus_nets dbg_cmd_slot   8] { lappend nets0 $n }
 foreach n [bus_nets dbg_cmd_exec  16] { lappend nets0 $n }
 foreach n [bus_nets dbg_cmd_trig  16] { lappend nets0 $n }
+# ---- prj11 B1: soft-core control plane (user domain, J_B1-③ register readback) ----
+lappend nets0 [one_net dbg_lite_owner]
+lappend nets0 [one_net dbg_lite_mode ]
+foreach n [bus_nets dbg_lite_slot  8] { lappend nets0 $n }
+foreach n [bus_nets dbg_lite_trig 16] { lappend nets0 $n }
+foreach n [bus_nets dbg_lite_exec 16] { lappend nets0 $n }
 set_property port_width [llength $nets0] [get_debug_ports u_ila_0/probe0]
 connect_debug_port u_ila_0/probe0 $nets0
 
@@ -248,7 +254,9 @@ if {$wns5 >= 0 && $whs5 >= 0} {
     write_checkpoint -force $proj/scripts/post_route.dcp
     write_debug_probes -force $proj/scripts/probes.ltx
     write_bitstream -force $proj/out/aurora_mem_bridge.bit
-    puts "DBG_BUILD_DONE: bit=$proj/out/aurora_mem_bridge.bit ltx=$proj/scripts/probes.ltx"
+    # prj11 B1: Software platform export (Vitis build uses it)
+    write_hw_platform -fixed -include_bit -force $proj/out/mb_ctrl.xsa
+    puts "DBG_BUILD_DONE: bit=$proj/out/aurora_mem_bridge.bit ltx=$proj/scripts/probes.ltx xsa=$proj/out/mb_ctrl.xsa"
     puts "W5_BUILD_OK"
 } else {
     puts "W5_BUILD_TIMING_FAIL: wns=$wns5 whs=$whs5 (未写位流)"

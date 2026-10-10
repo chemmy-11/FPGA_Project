@@ -88,7 +88,10 @@ module aurora_mem_bridge (
     output             c0_ddr4_act_n,
     // ---- 观测 LED（端口名沿用 prj9; T22 含义 = 内存校准完成）----
     output             led_loop   ,
-    output             led_link
+    output             led_link   ,
+    // ---- prj11 B1: UART (MicroBlaze 控制面, AE33/AF34, 9600) ----
+    input              uart_rxd   ,
+    output             uart_txd
 );
 
 //parameter define (official values)
@@ -111,6 +114,15 @@ wire          cmd_resp_busy;
 wire          cmd_cfg_mode;
 wire [7:0]    cmd_cfg_rd_slot;
 wire          cmd_rd_req_pulse;
+wire          cmd_cfg_wr_pulse;   // prj11 B1: 命令通道写选通（owner 仲裁用）
+// ---- prj11 B1: 软核控制面连线（声明前置: mem_rd_req 生成在 L~270 使用） ----
+wire        lite_cfg_mode, lite_cfg_wr_pulse, lite_rd_req_pulse;
+wire [7:0]  lite_cfg_rd_slot;
+wire [15:0] lite_exec_cnt, lite_rd_trig_cnt;
+reg         ctl_owner;                          // 0 = UDP 命令通道, 1 = 软核
+wire        cfg_mode_eff;
+wire [7:0]  cfg_rd_slot_eff;
+
 wire [15:0]   cmd_rx_cnt, cmd_err_cnt, cmd_exec_cnt, cmd_rd_trig_cnt;
 reg  [6:0]    tx_idle_cnt = 7'd0;         // RGMII TX 空闲拍数（≥64 才允许接管）
 wire          cmd_tx_idle = tx_idle_cnt[6];
@@ -263,7 +275,7 @@ wire [8:0]  mem_outstanding_sync;                     // user 域灰码镜像(�
 // W5: SEQ = 原自动逻辑; RND = 只由命令通道的 rd_req_pulse 触发（命令通道保证单拍）
 always @(posedge user_clk) begin
     if (aurora_rst)          mem_rd_req <= 1'b0;
-    else if (cmd_cfg_mode)   mem_rd_req <= cmd_rd_req_pulse;
+    else if (cfg_mode_eff)   mem_rd_req <= cmd_rd_req_pulse | lite_rd_req_pulse;
     else                     mem_rd_req <= (mem_outstanding_sync != 9'd0) && !mem_rd_busy && !mem_rd_req;
 end
 
@@ -605,9 +617,54 @@ cmd_channel u_cmd (
     .cfg_mode       (cmd_cfg_mode     ),
     .cfg_rd_slot    (cmd_cfg_rd_slot  ),
     .rd_req_pulse   (cmd_rd_req_pulse ),
+    .cfg_wr_pulse   (cmd_cfg_wr_pulse ),
     .cmd_exec_cnt   (cmd_exec_cnt     ),
     .rd_trig_cnt    (cmd_rd_trig_cnt  )
 );
+
+//*******************************************************************
+// ★ prj11 B1: 软核控制面（mb_ctrl BD: MicroBlaze+MDM+UARTLite+SmartConnect
+//   +axi_lite_regs 模块引用 —— W5 寄存器语义的 AXI4-Lite 从机, Q3 落点）
+//   双主仲裁 = "最近写者胜": 任一侧 SET_MODE/READ_SLOT 的写选通翻转
+//   ctl_owner; rd_req_pulse 两路 OR（读触发对当前槽位幂等）。
+//   时钟: clk_100m=init_clk(BUFG 后, MIG 同源); 软核域与 user/eth 无直接路径。
+//   复位: ext_reset_in=reset_pb|pma_init(上电 POR 由 pma_init_shift 提供,
+//         无须按键; pma_init 在配置后前 ~128 个 init_clk 拍为高)。
+//*******************************************************************
+always @(posedge user_clk) begin
+    if (aurora_rst)             ctl_owner <= 1'b0;
+    else if (lite_cfg_wr_pulse) ctl_owner <= 1'b1;
+    else if (cmd_cfg_wr_pulse)  ctl_owner <= 1'b0;
+end
+assign cfg_mode_eff    = ctl_owner ? lite_cfg_mode    : cmd_cfg_mode;
+assign cfg_rd_slot_eff = ctl_owner ? lite_cfg_rd_slot : cmd_cfg_rd_slot;
+
+mb_ctrl u_mb_ctrl (
+    .clk_100m        (init_clk            ),
+    .ext_reset_in    (reset_pb | pma_init ),   // 高有效 + 上电 POR
+    .uart_rxd        (uart_rxd            ),
+    .uart_txd        (uart_txd            ),
+    // user_clk 域（与 cmd_channel 同侧）
+    .clk_user        (user_clk            ),
+    .rst_user_n      (~aurora_rst         ),
+    .u_wr_frame      (mem_u_wr_frame      ),
+    .u_rd_frame      (mem_u_rd_frame      ),
+    .u_buf_drop      (mem_u_buf_drop      ),
+    .ctl_owner       (ctl_owner           ),
+    .cfg_mode        (lite_cfg_mode       ),
+    .cfg_rd_slot     (lite_cfg_rd_slot    ),
+    .rd_req_pulse    (lite_rd_req_pulse   ),
+    .cfg_wr_pulse    (lite_cfg_wr_pulse   ),
+    .lite_exec_cnt   (lite_exec_cnt       ),
+    .lite_rd_trig_cnt(lite_rd_trig_cnt    )
+);
+
+// prj11 B1: ILA0(@user_clk) 观测 —— J_B1 ③ 寄存器回读一致性
+(* mark_debug = "true" *) wire        dbg_lite_owner = ctl_owner;
+(* mark_debug = "true" *) wire        dbg_lite_mode  = cfg_mode_eff;
+(* mark_debug = "true" *) wire [7:0]  dbg_lite_slot  = cfg_rd_slot_eff;
+(* mark_debug = "true" *) wire [15:0] dbg_lite_trig  = lite_rd_trig_cnt;
+(* mark_debug = "true" *) wire [15:0] dbg_lite_exec  = lite_exec_cnt;
 
 //*******************************************************************
 // 帧泵 A：栈 TX（eth_rxc）→ user_clk —— 与 prj9 相同
@@ -641,7 +698,7 @@ frame_mem_if #(.SLOT_BASE(32'h0010_0000), .MAX_LEN(16'd1538)) u_mem (
     .rd_slot_o(mem_rd_slot_o), .rd_len_o(mem_rd_len_o),
     .rd_frame_done(mem_rd_frame_done),
     .rd_req (mem_rd_req), .rd_busy (mem_rd_busy),
-    .cfg_mode(cmd_cfg_mode), .cfg_rd_slot(cmd_cfg_rd_slot),  // W5: 命令通道控制（复位后默认 SEQ）
+    .cfg_mode(cfg_mode_eff), .cfg_rd_slot(cfg_rd_slot_eff),  // prj11 B1: owner 仲裁(复位后默认 UDP/SEQ)
     .ro_u_wr_frame(mem_u_wr_frame), .ro_u_rd_frame(mem_u_rd_frame),
     .ro_u_buf_drop(mem_u_buf_drop), .ro_u_hold_cycles(mem_u_hold_cycles),
     .ro_outstanding_sync(mem_outstanding_sync),

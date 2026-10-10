@@ -93,6 +93,10 @@ module cmd_channel #(
     output reg         cfg_mode,       // 0 = SEQ, 1 = RND  -> u_mem.cfg_mode
     output reg  [7:0]  cfg_rd_slot,    //                  -> u_mem.cfg_rd_slot
     output reg         rd_req_pulse,   // single user_clk pulse: trigger one read
+    output reg         cfg_wr_pulse,   // prj11 B1 additive: 1-clk strobe on
+                                       // SET_MODE(ok)/READ_SLOT -- top-level
+                                       // owner arbitration uses it (W5 port
+                                       // contract unchanged, pure extension)
     output reg  [15:0] cmd_exec_cnt,   // commands executed in the user domain
     output reg  [15:0] rd_trig_cnt     // read triggers (= successful READ_SLOT)
 );
@@ -836,11 +840,13 @@ always @(posedge clk_user or negedge rst_user_n) begin
         cfg_mode     <= 1'b0;               // SEQ after reset
         cfg_rd_slot  <= 8'd0;
         rd_req_pulse <= 1'b0;
+        cfg_wr_pulse <= 1'b0;               // prj11 B1 additive
         cmd_exec_cnt <= 16'd0;
         rd_trig_cnt  <= 16'd0;
     end
     else begin
         rd_req_pulse <= 1'b0;
+        cfg_wr_pulse <= 1'b0;               // prj11 B1 additive (default clear)
         case(ust)
         //------------------------------------------------ wait for a command
         U_IDLE: begin
@@ -854,13 +860,17 @@ always @(posedge clk_user or negedge rst_user_n) begin
                 u_v16c   <= 16'd0;
                 case(a_data[31:24])
                 OP_SET_MODE: begin
-                    if(a_data[23:16] <= 8'd1) cfg_mode <= a_data[16];
+                    if(a_data[23:16] <= 8'd1) begin
+                        cfg_mode <= a_data[16];
+                        cfg_wr_pulse <= 1'b1;          // prj11 B1 additive
+                    end
                     else                      u_status <= ST_BADARG;
                     ust <= U_RESP;
                 end
                 OP_READ_SLOT: begin
                     cfg_mode    <= 1'b1;                // random read mode
                     cfg_rd_slot <= a_data[23:16];       // 0..255 (256 slots)
+                    cfg_wr_pulse <= 1'b1;               // prj11 B1 additive
                     u_v16       <= {8'd0, a_data[23:16]};
                     u_v16b      <= rd_trig_cnt + 16'd1; // trigger sequence
                     ust         <= U_PULSE;             // cfg settles first

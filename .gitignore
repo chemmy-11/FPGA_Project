@@ -85,3 +85,14 @@ prj/project_10/prj_loop/.tmpCRC/
 
 # ===== Vivado 工程目录(prj11起统一, 可再生不提交) =====
 prj/project_11/vivado/
+
+# ===== prj11 软件构建产物(Vitis 工作区, 可再生) =====
+prj/project_11/sw/.metadata/
+prj/project_11/sw/mbplat/
+prj/project_11/sw/hello_regs*/
+prj/project_11/sw/IDE.log
+prj/project_11/sw/.analytics/
+prj/project_11/.tmpCRC/
+prj/project_11/iter_*.txt
+prj/project_11/sw/.analytics
+*.log.old

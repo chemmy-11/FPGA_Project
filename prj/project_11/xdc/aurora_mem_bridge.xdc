@@ -208,3 +208,11 @@ set_property PACKAGE_PIN AM21 [get_ports {c0_ddr4_dm_dbi_n[3]}]
 set_property PACKAGE_PIN AJ21 [get_ports {c0_ddr4_dm_dbi_n[2]}]
 set_property PACKAGE_PIN AE25 [get_ports {c0_ddr4_dm_dbi_n[1]}]
 set_property PACKAGE_PIN AD21 [get_ports {c0_ddr4_dm_dbi_n[0]}]
+
+## ---- prj11 B1: UART (CH340, COM7@9600; 引脚与 project_1 M1 相同) ----
+set_property -dict {PACKAGE_PIN AE33 IOSTANDARD LVCMOS18} [get_ports uart_rxd]
+set_property -dict {PACKAGE_PIN AF34 IOSTANDARD LVCMOS18} [get_ports uart_txd]
+# prj11 B1: AE33 落在 DDR4 校准字节组的 BITSLICE_1 [DRC PDRC-203] ——
+#   校准期间 uart_rxd 不可用是可接受的(MicroBlaze 由 POR 释放、自测在
+#   calib_done 后才运行), 显式确认此条件(位流 DRC 放行)
+set_property UNAVAILABLE_DURING_CALIBRATION TRUE [get_ports uart_rxd]
